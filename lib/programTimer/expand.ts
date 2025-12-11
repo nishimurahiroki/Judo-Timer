@@ -6,7 +6,7 @@ import type { ProgramStep } from "./types";
 /**
  * UUIDを生成する（ブラウザとサーバーの両方で動作）
  */
-function generateUUID(): string {
+export function generateUUID(): string {
   // ブラウザ環境
   if (typeof window !== "undefined" && window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
@@ -36,7 +36,7 @@ export function expandProgramRowsToSteps(rows: EditorRow[]): ProgramStep[] {
   // 1セットあたりの「行シーケンス」を作る（Row1 → Row2 → ... → RowN）
   const singleSequence: { label: string; duration: number }[] = rows.map(
     (row, rowIndex) => ({
-      label: row.name.trim() || `Step ${rowIndex + 1}`,
+      label: row.name.trim() || `Round ${rowIndex + 1}`,
       duration: row.durationSec,
     }),
   );
@@ -47,26 +47,54 @@ export function expandProgramRowsToSteps(rows: EditorRow[]): ProgramStep[] {
   // Omote/Ura トグル：少なくとも1行でも hasSides が true なら ON とみなす
   const omoteUraEnabled = rows.some((row) => row.hasSides);
 
-  // 各セット（ブロック）ごとにシーケンス全体を繰り返す
-  for (let loop = 1; loop <= setCount; loop++) {
-    const isOmoteBlock = loop % 2 === 1;
-    const blockColor = omoteUraEnabled
-      ? isOmoteBlock
-        ? "red"
-        : "blue"
-      : undefined;
-    const blockSide = omoteUraEnabled
-      ? (isOmoteBlock ? "omote" : "ura")
-      : undefined;
+  // セット数 > 1 かつ 裏表設定 ON の場合: 1セット = 表+裏の完全なサイクル
+  // それ以外: 従来通り（セットごとにシーケンスを繰り返す）
+  if (setCount > 1 && omoteUraEnabled) {
+    // 1セット = 表（omote）の全ステップ + 裏（ura）の全ステップ
+    for (let setIndex = 1; setIndex <= setCount; setIndex++) {
+      // 表（omote）のステップを追加
+      for (const seqItem of singleSequence) {
+        steps.push({
+          id: generateUUID(),
+          label: seqItem.label,
+          duration: seqItem.duration,
+          color: "red",
+          side: "omote",
+        });
+      }
+      // 裏（ura）のステップを追加
+      for (const seqItem of singleSequence) {
+        steps.push({
+          id: generateUUID(),
+          label: seqItem.label,
+          duration: seqItem.duration,
+          color: "blue",
+          side: "ura",
+        });
+      }
+    }
+  } else {
+    // 従来のロジック: セットごとにシーケンスを繰り返す（裏表設定がOFF、またはセット数=1）
+    for (let loop = 1; loop <= setCount; loop++) {
+      const isOmoteBlock = loop % 2 === 1;
+      const blockColor = omoteUraEnabled
+        ? isOmoteBlock
+          ? "red"
+          : "blue"
+        : undefined;
+      const blockSide = omoteUraEnabled
+        ? (isOmoteBlock ? "omote" : "ura")
+        : undefined;
 
-    for (const seqItem of singleSequence) {
-      steps.push({
-        id: generateUUID(),
-        label: seqItem.label,
-        duration: seqItem.duration,
-        color: blockColor,
-        side: blockSide,
-      });
+      for (const seqItem of singleSequence) {
+        steps.push({
+          id: generateUUID(),
+          label: seqItem.label,
+          duration: seqItem.duration,
+          color: blockColor,
+          side: blockSide,
+        });
+      }
     }
   }
 

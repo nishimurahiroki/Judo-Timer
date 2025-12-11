@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 type JudoTimerScaledContainerProps = {
   children: ReactNode;
   className?: string;
+  id?: string;
 };
 
 // デスクトップベース解像度（元のサイズ）
@@ -51,6 +52,7 @@ function getBaseResolutionAndZoom(
 export function JudoTimerScaledContainer({
   children,
   className,
+  id,
 }: JudoTimerScaledContainerProps) {
   const [scale, setScale] = useState(1);
   const [baseWidth, setBaseWidth] = useState(1600);
@@ -172,7 +174,7 @@ export function JudoTimerScaledContainer({
   };
 
   return (
-    <div className={`fixed inset-0 flex items-center justify-center overflow-hidden z-50 ${className || "bg-black"}`}>
+    <div id={id} className={`fixed inset-0 flex items-center justify-center overflow-hidden z-50 ${className || "bg-black"}`}>
       {/* 16:9 ルートコンテナ */}
       <div
         ref={containerRef}
@@ -187,47 +189,6 @@ export function JudoTimerScaledContainer({
         {/* 既存のJudoTimer UI */}
         {children}
       </div>
-
-      {/* フルスクリーンボタン */}
-      <button
-        onClick={toggleFullscreen}
-        className={`absolute top-4 right-4 z-[100] rounded-md px-3 py-2 transition-colors shadow-lg ${
-          className?.includes("bg-white")
-            ? "bg-white/90 text-blue-500 hover:bg-white border-2 border-blue-400"
-            : "bg-black/50 text-white hover:bg-black/70"
-        }`}
-        aria-label="Toggle fullscreen"
-      >
-        {isFullscreen ? (
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        ) : (
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-            />
-          </svg>
-        )}
-      </button>
 
       {/* 縦向きオーバーレイ */}
       {isPortrait && (
