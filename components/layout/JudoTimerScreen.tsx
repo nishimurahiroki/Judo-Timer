@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useJudoTimer } from "@/hooks/useJudoTimer";
 import { TimerDisplay } from "@/components/timer/TimerDisplay";
 import { useOsaekomiTimers } from "@/hooks/useOsaekomiTimers";
@@ -135,6 +136,7 @@ type JudoTimerScreenProps = {
 export function JudoTimerScreen({
   initialSettings = DEFAULT_SETTINGS,
 }: JudoTimerScreenProps) {
+  const router = useRouter();
   // 表示するパネル（タイマー / スコア / 設定）
   // 初期値は "timer" に固定（SSR/CSR のハイドレーションエラーを防ぐため）
   const [activePanel, setActivePanel] = useState<PanelKey>("timer");
@@ -818,9 +820,7 @@ export function JudoTimerScreen({
         {/* Homeボタン - Fullscreenボタンと同じ高さに配置（左側） */}
         <button
           onClick={() => {
-            if (typeof window !== "undefined") {
-              window.location.href = "/";
-            }
+            router.push("/");
           }}
           className="absolute top-4 left-4 z-[100] rounded-md px-3 py-2 transition-colors"
           style={{ color: "white" }}

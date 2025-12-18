@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -12,6 +13,7 @@ type TimerType = "judo" | "kosen" | "program";
 const LAST_USED_TIMER_KEY = "lastUsedTimer";
 
 export default function HomePage() {
+  const router = useRouter();
   const [lastUsedTimer, setLastUsedTimer] = useState<TimerType | null>(null);
   const [lastStartedProgramId, setLastStartedProgramId] = useState<string | null>(null);
   const [savedPrograms, setSavedPrograms] = useState<Program[]>([]);
@@ -67,22 +69,23 @@ export default function HomePage() {
   };
 
   const handleRecentlyUsedClick = () => {
-    if (lastStartedProgramId) {
-      // Check if it's a template ID or a saved program ID
-      if (lastStartedProgramId.startsWith("template:")) {
-        // Template ID - navigate to program page with template ID
-        window.location.href = `/program?run=${lastStartedProgramId}`;
-      } else {
-        // Saved program ID - find the program
-        const program = savedPrograms.find((p) => p.id === lastStartedProgramId);
-        if (program) {
-          // Navigate to program page with the program ID in the URL
-          window.location.href = `/program?run=${program.id}`;
-        } else {
-          // Program not found, just navigate to program page
-          window.location.href = "/program";
-        }
-      }
+    if (!lastStartedProgramId) return;
+
+    // Check if it's a template ID or a saved program ID
+    if (lastStartedProgramId.startsWith("template:")) {
+      // Template ID - navigate to program page with template ID
+      router.push(`/program?run=${lastStartedProgramId}`);
+      return;
+    }
+
+    // Saved program ID - find the program
+    const program = savedPrograms.find((p) => p.id === lastStartedProgramId);
+    if (program) {
+      // Navigate to program page with the program ID in the URL
+      router.push(`/program?run=${program.id}`);
+    } else {
+      // Program not found, just navigate to program page
+      router.push("/program");
     }
   };
 
@@ -248,7 +251,7 @@ export default function HomePage() {
                 key={card.title}
                 onClick={() => {
                   handleTimerClick(card.timerType);
-                  window.location.href = card.href;
+                  router.push(card.href);
                 }}
                 style={{
                   width: mobileCardWidth,
@@ -450,8 +453,8 @@ export default function HomePage() {
                 borderRadius: "20px",
               }}
               onClick={() => {
-                // Placeholder: Navigate to program timer create
-                window.location.href = "/program";
+                // Navigate to program timer create (respects basePath via Next.js router)
+                router.push("/program");
               }}
             >
               + Create Timer
@@ -508,7 +511,7 @@ export default function HomePage() {
                 onClick={(e) => {
                   e.preventDefault();
                   handleTimerClick("judo");
-                  window.location.href = "/judo";
+                  router.push("/judo");
                 }}
               >
                 Start
@@ -562,7 +565,7 @@ export default function HomePage() {
                 onClick={(e) => {
                   e.preventDefault();
                   handleTimerClick("kosen");
-                  window.location.href = "/kosen";
+                  router.push("/kosen");
                 }}
               >
                 Start
@@ -616,7 +619,7 @@ export default function HomePage() {
                 onClick={(e) => {
                   e.preventDefault();
                   handleTimerClick("program");
-                  window.location.href = "/program";
+                  router.push("/program");
                 }}
               >
                 Start
