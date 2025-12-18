@@ -1,7 +1,7 @@
 // hooks/useProgramTimer.ts
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type {
   ProgramStep,
   ProgramTimerStatus,
@@ -39,6 +39,10 @@ export type UseProgramTimerResult = {
   next: () => void;
   prev: () => void;
   skipToStep: (index: number) => void;
+  
+  // プログラム編集用メソッド
+  updateSteps: (newSteps: ProgramStep[]) => void;
+  updateActiveTimerDuration: (newDuration: number) => void;
 };
 
 type InternalState = {
@@ -80,21 +84,33 @@ export function useProgramTimer(
     createInitialState(steps),
   );
 
-  // steps変更時にリセット
-  // steps配列の内容（特にduration）が変更された場合もリセットする必要があるため、
-  // steps配列全体を依存配列に使用する
+  // stepsの参照を保持（手動更新を許可するため）
+  const [internalSteps, setInternalSteps] = useState<ProgramStep[]>(steps);
+  const stepsRef = useRef<ProgramStep[]>(steps);
+  const isInitialMountRef = useRef(true);
+  
+  // stepsが外部から変更された場合のみ更新（初回マウント時のみリセット）
   useEffect(() => {
+    // 参照が変わった場合のみ更新（手動更新を区別するため）
+    if (steps !== stepsRef.current) {
+      stepsRef.current = steps;
+      setInternalSteps(steps);
+      // 初回マウント時のみリセット
+      if (isInitialMountRef.current) {
     setState(createInitialState(steps));
-  }, [steps]); // steps配列全体に依存して、内容変更時もリセット
+        isInitialMountRef.current = false;
+      }
+    }
+  }, [steps]);
 
   const currentStep: ProgramStep | null =
-    steps[state.currentStepIndex] ?? null;
+    internalSteps[state.currentStepIndex] ?? null;
   const nextStep: ProgramStep | null =
-    steps[state.currentStepIndex + 1] ?? null;
+    internalSteps[state.currentStepIndex + 1] ?? null;
 
   const totalDurationSec: number = useMemo(() => {
-    return steps.reduce((sum, s) => sum + s.duration, 0);
-  }, [steps]);
+    return internalSteps.reduce((sum, s) => sum + s.duration, 0);
+  }, [internalSteps]);
 
   const progressInStep =
     currentStep && currentStep.duration > 0
@@ -115,7 +131,7 @@ export function useProgramTimer(
       currentStep &&
       typeof onStepChange === "function"
     ) {
-      const prevStep = steps[prevIndex] ?? null;
+      const prevStep = internalSteps[prevIndex] ?? null;
       onStepChange({
         step: currentStep,
         index: state.currentStepIndex,
@@ -139,16 +155,16 @@ export function useProgramTimer(
   // 1秒ごとの tick
   useEffect(() => {
     if (state.status !== "running") return;
-    if (!steps.length) return;
+    if (!internalSteps.length) return;
 
     const id = window.setInterval(() => {
       setState((prev) => {
         if (prev.status !== "running") return prev;
-        if (!steps.length) {
+        if (!internalSteps.length) {
           return { ...prev, status: "finished" };
         }
 
-        const current = steps[prev.currentStepIndex];
+        const current = internalSteps[prev.currentStepIndex];
         if (!current) {
           return { ...prev, status: "finished" };
         }
@@ -165,18 +181,18 @@ export function useProgramTimer(
         const consumed = prev.remainingSec || 1;
         const nextIndex = prev.currentStepIndex + 1;
 
-        if (nextIndex >= steps.length) {
+        if (nextIndex >= internalSteps.length) {
           return {
             ...prev,
             status: "finished",
-            currentStepIndex: steps.length - 1,
+            currentStepIndex: internalSteps.length - 1,
             remainingSec: 0,
             elapsedInStepSec: current.duration,
             totalElapsedSec: prev.totalElapsedSec + consumed,
           };
         }
 
-        const nextStep = steps[nextIndex];
+        const nextStep = internalSteps[nextIndex];
 
         return {
           ...prev,
@@ -192,13 +208,13 @@ export function useProgramTimer(
     return () => {
       window.clearInterval(id);
     };
-  }, [state.status, steps.length, steps]);
+  }, [state.status, internalSteps]);
 
   const start = () => {
-    if (!steps.length) return;
+    if (!internalSteps.length) return;
 
     setState((prev) => {
-      const first = steps[0];
+      const first = internalSteps[0];
 
       if (prev.status === "idle" || prev.status === "finished") {
         return {
@@ -234,12 +250,12 @@ export function useProgramTimer(
   };
 
   const reset = () => {
-    setState(createInitialState(steps));
+    setState(createInitialState(internalSteps));
   };
 
   const skipToStep = (index: number) => {
-    if (index < 0 || index >= steps.length) return;
-    const target = steps[index];
+    if (index < 0 || index >= internalSteps.length) return;
+    const target = internalSteps[index];
 
     setState((prev) => ({
       ...prev,
@@ -249,13 +265,40 @@ export function useProgramTimer(
       // totalElapsedSec は v1 ではそのまま保持
     }));
   };
+  
+  // プログラム編集用メソッド
+  const updateSteps = (newSteps: ProgramStep[]) => {
+    setInternalSteps(newSteps);
+    stepsRef.current = newSteps;
+    // 非アクティブなタイマーの変更は即座に適用（リセットしない）
+  };
+  
+  // アクティブなタイマーのdurationを更新（原子論的に適用）
+  const updateActiveTimerDuration = (newDuration: number) => {
+    setState((prev) => ({
+      ...prev,
+      remainingSec: newDuration,
+      elapsedInStepSec: 0, // 経過時間をリセット
+    }));
+    // stepsも更新
+    setInternalSteps((prevSteps) => {
+      const updated = [...prevSteps];
+      if (updated[state.currentStepIndex]) {
+        updated[state.currentStepIndex] = {
+          ...updated[state.currentStepIndex],
+          duration: newDuration,
+        };
+      }
+      return updated;
+    });
+  };
 
   const next = () => skipToStep(state.currentStepIndex + 1);
   const prev = () => skipToStep(state.currentStepIndex - 1);
 
   useEffect(() => {
     if (!autoStart) return;
-    if (!steps.length) return;
+    if (!internalSteps.length) return;
     start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -277,5 +320,7 @@ export function useProgramTimer(
     next,
     prev,
     skipToStep,
+    updateSteps,
+    updateActiveTimerDuration,
   };
 }

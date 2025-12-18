@@ -4,11 +4,13 @@
 import { useEffect, useState } from "react";
 import type { Program } from "@/lib/programTimer/types";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
+import { createProgramFromTemplate, type TemplateId } from "@/lib/programTimer/templates";
 import { ProgramTimerHome } from "@/components/programTimer/ProgramTimerHome";
 import { ProgramRunScreen } from "@/components/programTimer/ProgramRunScreen";
 import { ProgramRunScreenMobile } from "@/components/programTimer/ProgramRunScreenMobile";
 import { ProgramCreateOverlay } from "@/components/programTimer/ProgramCreateOverlay";
 import { JudoTimerScaledContainer } from "@/components/layout/JudoTimerScaledContainer";
+import { setLastStartedProgramId } from "@/lib/recentProgramTimer";
 
 // フルスクリーン切り替え関数
 const toggleFullscreen = async () => {
@@ -49,6 +51,12 @@ const toggleFullscreen = async () => {
 
 type Mode = "home" | "run";
 
+const upsertToFront = (list: Program[], program: Program, max = 10): Program[] => {
+  const filtered = list.filter((p) => p.id !== program.id);
+  const updated = [program, ...filtered];
+  return updated.slice(0, max);
+};
+
 export default function ProgramPage() {
   const [mode, setMode] = useState<Mode>("home");
   const [isCreating, setIsCreating] = useState(false);
@@ -60,8 +68,9 @@ export default function ProgramPage() {
   const [stepsToRun, setStepsToRun] = useState<
     ReturnType<typeof expandProgramRowsToSteps>
   >([]);
+  const [autoStart, setAutoStart] = useState(false);
 
-  // テンプレート（現時点では空）
+  // 現在テンプレ一覧は直接使用していないが、型整合性のため空配列を渡す
   const templatePrograms: Program[] = [];
 
   // LocalStorage から保存済みProgramを読み込み
@@ -76,7 +85,38 @@ export default function ProgramPage() {
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         // ゆるく Program[] として扱う（厳密にやりたければ型ガードを追加）
-        setSavedPrograms(parsed as Program[]);
+        const programs = parsed as Program[];
+        setSavedPrograms(programs);
+
+        // Check for query parameter to auto-run a program
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const runProgramId = params.get("run");
+          if (runProgramId) {
+            // Check if it's a template ID
+            if (runProgramId.startsWith("template:")) {
+              try {
+                const templateId = runProgramId as TemplateId;
+                const templateProgram = createProgramFromTemplate(templateId);
+                setEditingProgram(templateProgram);
+                setIsCreating(true);
+                // Clean up the URL
+                window.history.replaceState({}, "", "/program");
+              } catch (e) {
+                console.error("Failed to prepare template program from run param", e);
+              }
+            } else {
+              // Regular saved program
+              const programToRun = programs.find((p) => p.id === runProgramId);
+              if (programToRun) {
+                // Auto-run the program (handleRunProgram already sets the last started ID)
+                handleRunProgram(programToRun);
+                // Clean up the URL
+                window.history.replaceState({}, "", "/program");
+              }
+            }
+          }
+        }
       }
     } catch (e) {
       console.error("Failed to load saved programs", e);
@@ -95,11 +135,7 @@ export default function ProgramPage() {
 
   const handleSaveProgram = (program: Program, autoRun: boolean) => {
     setSavedPrograms((prev) => {
-      const exists = prev.some((p) => p.id === program.id);
-
-      const updated = exists
-        ? prev.map((p) => (p.id === program.id ? program : p))
-        : [...prev, program];
+      const updated = upsertToFront(prev, program, 10);
 
       // LocalStorage に保存
       if (typeof window !== "undefined") {
@@ -116,15 +152,36 @@ export default function ProgramPage() {
     setEditingProgram(null);
 
     if (autoRun) {
+      // Store the last started program timer
+      setLastStartedProgramId(program.id);
       // 展開してから実行
       const steps = expandProgramRowsToSteps(program.rows);
       setStepsToRun(steps);
       setSelectedProgram(program);
+      setAutoStart(false); // Do not auto-start - wait for user to tap Start
       setMode("run");
     }
   };
 
   const handleRunProgram = (program: Program) => {
+    // Store the last started program timer
+    setLastStartedProgramId(program.id);
+
+    // Run対象が保存済みなら、表示順を「最近使った順」に更新
+    setSavedPrograms((prev) => {
+      const exists = prev.some((p) => p.id === program.id);
+      if (!exists) return prev;
+      const updated = upsertToFront(
+        prev.map((p) => (p.id === program.id ? program : p)),
+        program,
+        10,
+      );
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("saved-programs", JSON.stringify(updated));
+      }
+      return updated;
+    });
+
     // 展開してから実行
     const steps = expandProgramRowsToSteps(program.rows);
     setStepsToRun(steps);
@@ -136,6 +193,7 @@ export default function ProgramPage() {
     setMode("home");
     setSelectedProgram(null);
     setStepsToRun([]);
+    setAutoStart(false); // Reset auto-start flag
   };
 
   const handleEditProgram = (program: Program) => {
@@ -265,6 +323,26 @@ export default function ProgramPage() {
               steps={stepsToRun}
               programTitle={selectedProgram.title}
               onBackToHome={handleBackToHome}
+              selectedProgram={selectedProgram}
+              autoStart={autoStart}
+              onProgramUpdate={(program) => {
+                // プログラムを更新
+                setSelectedProgram(program);
+                // stepsを再展開
+                const newSteps = expandProgramRowsToSteps(program.rows);
+                setStepsToRun(newSteps);
+                // 保存済みプログラムも更新
+                setSavedPrograms((prev) => {
+                  const updated = prev.map((p) => (p.id === program.id ? program : p));
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem(
+                      "saved-programs",
+                      JSON.stringify(updated),
+                    );
+                  }
+                  return updated;
+                });
+              }}
             />
           </JudoTimerScaledContainer>
         </div>
@@ -319,6 +397,26 @@ export default function ProgramPage() {
             steps={stepsToRun}
             programTitle={selectedProgram.title}
             onBackToHome={handleBackToHome}
+            selectedProgram={selectedProgram}
+            autoStart={autoStart}
+            onProgramUpdate={(program) => {
+              // プログラムを更新
+              setSelectedProgram(program);
+              // stepsを再展開
+              const newSteps = expandProgramRowsToSteps(program.rows);
+              setStepsToRun(newSteps);
+              // 保存済みプログラムも更新
+              setSavedPrograms((prev) => {
+                const updated = prev.map((p) => (p.id === program.id ? program : p));
+                if (typeof window !== "undefined") {
+                  window.localStorage.setItem(
+                    "saved-programs",
+                    JSON.stringify(updated),
+                  );
+                }
+                return updated;
+              });
+            }}
           />
         </div>
       </>
@@ -327,7 +425,7 @@ export default function ProgramPage() {
 
   // Home mode: normal page layout
   return (
-    <div className="min-h-screen w-full bg-white">
+    <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
           <ProgramTimerHome
             templates={templatePrograms}
             saved={savedPrograms}
@@ -335,6 +433,7 @@ export default function ProgramPage() {
             onRunProgram={handleRunProgram}
         onEditProgram={handleEditProgram}
         onDeleteProgram={handleDeleteProgram}
+        onSaveProgram={handleSaveProgram}
           />
           {isCreating && (
             <ProgramCreateOverlay

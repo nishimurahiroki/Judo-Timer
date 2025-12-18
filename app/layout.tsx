@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Istok_Web } from "next/font/google";
 import "./globals.css";
-import { AppNavBar } from "@/components/layout/AppNavBar";
 
 const istokWeb = Istok_Web({
   weight: ["400", "700"],
@@ -25,9 +24,8 @@ export default function RootLayout({
     <html lang="ja" className={istokWeb.variable}>
       <body className="bg-black text-white">
         <div className="min-h-screen flex flex-col">
-          <AppNavBar />
           {/* 各ページがレイアウトを決めやすいように、mainはシンプルにしておく */}
-          <main className="flex-1 px-2 sm:px-4 py-4">
+          <main className="flex-1">
             {children}
           </main>
         </div>
