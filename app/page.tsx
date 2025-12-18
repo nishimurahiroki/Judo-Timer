@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { asset } from "../src/lib/asset";
+import { asset } from "@/lib/asset";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { getLastStartedProgramId } from "@/lib/recentProgramTimer";
 import type { Program } from "@/lib/programTimer/types";

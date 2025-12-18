@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { asset } from "../../src/lib/asset";
+import { asset } from "@/lib/asset";
 
 type MenuItem = "home" | "judo" | "kosen" | "program";
 

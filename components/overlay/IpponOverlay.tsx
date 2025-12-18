@@ -1,7 +1,7 @@
-\"use client\";
+"use client";
 
-import { useEffect, useRef } from \"react\";
-import { asset } from \"../../src/lib/asset\";
+import { useEffect, useRef } from "react";
+import { asset } from "@/lib/asset";
 
 export type IpponOverlayProps = {
   visible: boolean;

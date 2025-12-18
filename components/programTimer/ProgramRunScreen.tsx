@@ -9,7 +9,7 @@ import type { ProgramStep, Program } from "@/lib/programTimer/types";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
 import { formatTimerTitle } from "@/lib/programTimer/formatTitle";
-import { asset } from "../../src/lib/asset";
+import { asset } from "@/lib/asset";
 
 const istokWeb = Istok_Web({
   weight: ["400", "700"],

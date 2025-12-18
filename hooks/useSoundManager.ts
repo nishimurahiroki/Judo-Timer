@@ -1,7 +1,7 @@
-\"use client\";
+"use client";
 
-import { useRef, useEffect } from \"react\";
-import { asset } from \"../src/lib/asset\";
+import { useRef, useEffect } from "react";
+import { asset } from "@/lib/asset";
 
 export type SoundKey = "timerStart" | "timerEnd" | "scoreWazaYuko";
 
