@@ -10,6 +10,7 @@ import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
 import { formatTimerTitle } from "@/lib/programTimer/formatTitle";
 import { asset } from "@/lib/asset";
+import { useSoundManager } from "@/hooks/useSoundManager";
 
 const istokWeb = Istok_Web({
   weight: ["400", "700"],
@@ -37,6 +38,8 @@ export function ProgramRunScreen({
   autoStart = false,
 }: ProgramRunScreenProps) {
   const router = useRouter();
+  // ProgramTimer では常にサウンド有効として扱う（設定連動は既存仕様に影響しないよう変更しない）
+  const { play: playSound } = useSoundManager(true);
   const {
     status,
     currentStepIndex,
@@ -187,52 +190,6 @@ export function ProgramRunScreen({
     return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  // Start ready overlay
-  const startReadyOverlay = useCallback(() => {
-    if (readyOverlayShown) return; // Already shown in this session
-    
-    setReadyActive(true);
-    setReadySecondsLeft(3);
-    setReadyOverlayShown(true);
-    // Reset end sound flag when starting a new run
-    setEndSoundPlayed(false);
-    
-    // Play audio - create new instance each time to avoid delay
-    try {
-      // Create new audio instance for immediate playback
-      const audio = new Audio(asset("/sounds/ready_count.mp3"));
-      audio.currentTime = 0;
-      
-      // Play immediately
-      audio.play().catch((err) => {
-        console.error("Failed to play ready audio:", err);
-      });
-      
-      // Also update ref for cleanup
-      readyAudioRef.current = audio;
-    } catch (err) {
-      console.error("Failed to play ready audio:", err);
-    }
-    
-    // Countdown interval
-    readyIntervalRef.current = setInterval(() => {
-      setReadySecondsLeft((prev) => {
-        if (prev <= 1) {
-          // Countdown finished
-          if (readyIntervalRef.current) {
-            clearInterval(readyIntervalRef.current);
-            readyIntervalRef.current = null;
-          }
-          setReadyActive(false);
-          // Start the timer
-          start();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [readyOverlayShown, start]);
-
   // Unlock audio on user gesture (Start button) to bypass autoplay restrictions
   const unlockAudio = useCallback(() => {
     if (prepAudioRef.current) {
@@ -259,11 +216,8 @@ export function ProgramRunScreen({
       prepForceStopRef.current = false;
       // Unlock audio on user gesture (Start button)
       unlockAudio();
-      // Start ready overlay if not shown yet
-      if (!readyOverlayShown) {
-        startReadyOverlay();
-        return;
-      }
+      // JudoTimer と同じ開始サウンドを再生（ユーザー操作ハンドラ内で即時再生）
+      playSound("timerStart");
       // Reset end sound flag when starting a new run
       setEndSoundPlayed(false);
       // Reset run session ID
@@ -285,7 +239,7 @@ export function ProgramRunScreen({
   // Reset timer to beginning of current step
   const resetTimer = () => {
     reset();
-    // Reset ready overlay flag so it can show again
+    // Reset ready overlay related state（countdown は廃止済みだが初期値に戻しておく）
     setReadyOverlayShown(false);
     setReadyActive(false);
     setReadySecondsLeft(3);
@@ -673,12 +627,15 @@ export function ProgramRunScreen({
     };
   }, [isUra]);
 
-  // Auto-start ready overlay when autoStart is true
+  // Auto-start when autoStart is true (no pre-start overlay)
   useEffect(() => {
     if (autoStart && status === "idle" && !readyOverlayShown) {
-      startReadyOverlay();
+      // 直接タイマー開始
+      setEndSoundPlayed(false);
+      runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
+      start();
     }
-  }, [autoStart, status, readyOverlayShown, startReadyOverlay]);
+  }, [autoStart, status, readyOverlayShown, start]);
 
   // Centralized prep sound playback function with comprehensive logging
   const playPrepSound = useCallback((stepKey: string, ctx: {
@@ -1143,42 +1100,6 @@ export function ProgramRunScreen({
           )}
         </div>
       </footer>
-
-      {/* Ready overlay */}
-      {readyActive && (
-        <div 
-          className="absolute inset-0 flex flex-col items-center justify-center z-[60] pointer-events-auto"
-          style={{
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-          }}
-        >
-          {/* "Are you ready?" text */}
-          <div
-            className="text-center mb-8"
-            style={{
-              fontFamily: istokWeb.style.fontFamily,
-              fontSize: "clamp(3rem, 8vw, 8rem)",
-              fontWeight: 700,
-              color: "#0015FF",
-            }}
-          >
-            Are you ready?
-          </div>
-          
-          {/* Countdown number */}
-          <div
-            className="text-center"
-            style={{
-              fontFamily: istokWeb.style.fontFamily,
-              fontSize: "clamp(8rem, 20vw, 20rem)",
-              fontWeight: 700,
-              color: "#000000",
-            }}
-          >
-            {readySecondsLeft}
-          </div>
-        </div>
-      )}
 
       {/* Finish overlay */}
       {status === "finished" && (

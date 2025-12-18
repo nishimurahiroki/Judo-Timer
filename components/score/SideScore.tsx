@@ -56,61 +56,124 @@ export function SideScore({
 
       {/* I / W / Y ラベル + スコア数字（3カラム構造） */}
       <div className="flex justify-between w-[400px] mt-0">
-        {/* I 列 */}
-        <div className="flex flex-col items-center">
-          <span
-            className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
-          >
-            I
-          </span>
-          <span
-            className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
-            onClick={() => onAddIppon?.()}
-            style={{
-              // アウトラインだけでなく中身も見えるように、塗りつぶしは色クラスに任せる
-              WebkitTextStroke: effectiveStroke,
-            }}
-          >
-            {score.ippon}
-          </span>
-        </div>
+        {isWhite ? (
+          <>
+            {/* Player1: 表示順を Y / W / I に変更 */}
+            {/* Y 列（Yuko を使う場合のみ表示） */}
+            {showYuko && (
+              <div className="flex flex-col items-center">
+                <span
+                  className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
+                >
+                  Y
+                </span>
+                <span
+                  className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
+                  onClick={() => onAddYuko?.()}
+                  style={{
+                    WebkitTextStroke: effectiveStroke,
+                  }}
+                >
+                  {score.yuko}
+                </span>
+              </div>
+            )}
 
-        {/* W 列 */}
-        <div className="flex flex-col items-center">
-          <span
-            className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
-          >
-            W
-          </span>
-          <span
-            className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
-            onClick={() => onAddWazaari?.()}
-            style={{
-              WebkitTextStroke: effectiveStroke,
-            }}
-          >
-            {score.wazaari}
-          </span>
-        </div>
+            {/* W 列 */}
+            <div className="flex flex-col items-center">
+              <span
+                className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
+              >
+                W
+              </span>
+              <span
+                className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
+                onClick={() => onAddWazaari?.()}
+                style={{
+                  WebkitTextStroke: effectiveStroke,
+                }}
+              >
+                {score.wazaari}
+              </span>
+            </div>
 
-        {/* Y 列（Yuko を使う場合のみ表示） */}
-        {showYuko && (
-          <div className="flex flex-col items-center">
-            <span
-              className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
-            >
-              Y
-            </span>
-            <span
-              className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
-              onClick={() => onAddYuko?.()}
-              style={{
-              WebkitTextStroke: effectiveStroke,
-              }}
-            >
-              {score.yuko}
-            </span>
-          </div>
+            {/* I 列 */}
+            <div className="flex flex-col items-center">
+              <span
+                className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
+              >
+                I
+              </span>
+              <span
+                className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
+                onClick={() => onAddIppon?.()}
+                style={{
+                  WebkitTextStroke: effectiveStroke,
+                }}
+              >
+                {score.ippon}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Player2 など: 既存どおり I / W / Y の順番 */}
+            {/* I 列 */}
+            <div className="flex flex-col items-center">
+              <span
+                className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
+              >
+                I
+              </span>
+              <span
+                className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
+                onClick={() => onAddIppon?.()}
+                style={{
+                  WebkitTextStroke: effectiveStroke,
+                }}
+              >
+                {score.ippon}
+              </span>
+            </div>
+
+            {/* W 列 */}
+            <div className="flex flex-col items-center">
+              <span
+                className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
+              >
+                W
+              </span>
+              <span
+                className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
+                onClick={() => onAddWazaari?.()}
+                style={{
+                  WebkitTextStroke: effectiveStroke,
+                }}
+              >
+                {score.wazaari}
+              </span>
+            </div>
+
+            {/* Y 列（Yuko を使う場合のみ表示） */}
+            {showYuko && (
+              <div className="flex flex-col items-center">
+                <span
+                  className={`text-[30px] tracking-wide mb-[-20px] ${effectiveColorClass}`}
+                >
+                  Y
+                </span>
+                <span
+                  className={`cursor-pointer select-none font-bold text-[120px] font-mono ${effectiveColorClass}`}
+                  onClick={() => onAddYuko?.()}
+                  style={{
+                    WebkitTextStroke: effectiveStroke,
+                  }}
+                >
+                  {score.yuko}
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
