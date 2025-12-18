@@ -45,7 +45,7 @@ function TemplateCard({
       }}
     >
       <Image
-        src={`/image/${imageName}`}
+        src={asset(`/image/${imageName}`)}
         alt={title}
         fill
         className="object-cover"
