@@ -9,6 +9,7 @@ import type { ProgramStep, Program } from "@/lib/programTimer/types";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
 import { formatTimerTitle } from "@/lib/programTimer/formatTitle";
+import { asset } from "../../src/lib/asset";
 
 const istokWeb = Istok_Web({
   weight: ["400", "700"],
@@ -100,20 +101,20 @@ export function ProgramRunScreen({
   // Preload audio files on mount to prevent delay on first play
   useEffect(() => {
     // Preload ready_count.mp3
-    const readyAudio = new Audio("/sounds/ready_count.mp3");
+    const readyAudio = new Audio(asset("/sounds/ready_count.mp3"));
     readyAudio.preload = "auto";
     readyAudio.load(); // Force load
     readyAudioRef.current = readyAudio;
     
     // Preload timer-end.mp3
-    const endAudio = new Audio("/sounds/timer-end.mp3");
+    const endAudio = new Audio(asset("/sounds/timer-end.mp3"));
     endAudio.preload = "auto";
     endAudio.load(); // Force load
     endAudioRef.current = endAudio;
     
     // Preload timer-prep.mp3 - use single reusable instance (per spec)
     // Force: preload="auto", volume=1.0, muted=false
-    const prepAudio = new Audio("/sounds/timer-prep.mp3");
+    const prepAudio = new Audio(asset("/sounds/timer-prep.mp3"));
     prepAudio.preload = "auto";
     prepAudio.volume = 1.0;
     prepAudio.muted = false;
@@ -199,7 +200,7 @@ export function ProgramRunScreen({
     // Play audio - create new instance each time to avoid delay
     try {
       // Create new audio instance for immediate playback
-      const audio = new Audio("/sounds/ready_count.mp3");
+      const audio = new Audio(asset("/sounds/ready_count.mp3"));
       audio.currentTime = 0;
       
       // Play immediately
@@ -719,7 +720,7 @@ export function ProgramRunScreen({
     // This is the most reliable way to ensure playback works
     // Reusing the same instance can cause issues with browser autoplay policies
     try {
-      const newAudio = new Audio("/sounds/timer-prep.mp3");
+      const newAudio = new Audio(asset("/sounds/timer-prep.mp3"));
       newAudio.volume = 1.0;
       newAudio.muted = false;
       newAudio.currentTime = 0;
@@ -915,7 +916,7 @@ export function ProgramRunScreen({
   useEffect(() => {
     if (status === "finished" && !endSoundPlayed) {
       try {
-        const audio = endAudioRef.current || new Audio("/sounds/timer-end.mp3");
+        const audio = endAudioRef.current || new Audio(asset("/sounds/timer-end.mp3"));
         audio.currentTime = 0; // Reset to start
         audio.play().catch((err) => {
           console.error("Failed to play end sound:", err);

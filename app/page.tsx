@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { asset } from "../src/lib/asset";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { getLastStartedProgramId } from "@/lib/recentProgramTimer";
 import type { Program } from "@/lib/programTimer/types";
@@ -170,13 +171,13 @@ export default function HomePage() {
               height: logoHeightMobile,
             }}
           >
-            <Image
-              src="/image/GatameKosenJudo_logo.png"
-              alt="Gatame Kosen Judo Logo"
-              fill
-              style={{ objectFit: "contain" }}
-              priority
-            />
+          <Image
+            src={asset("/image/GatameKosenJudo_logo.png")}
+            alt="Gatame Kosen Judo Logo"
+            fill
+            style={{ objectFit: "contain" }}
+            priority
+          />
           </div>
 
           {/* Text: "Gatame Timer" */}
@@ -228,24 +229,24 @@ export default function HomePage() {
           >
             {/* Judo / Kosen / Program cards */}
             {[
-              {
-                title: "Judo Timer",
-                href: "/judo",
-                image: "/image/judo_timer_icon_mobile.png",
-                timerType: "judo" as TimerType,
-              },
-              {
-                title: "Kosen Judo Timer",
-                href: "/kosen",
-                image: "/image/kosen_timer_icon_mobile.png",
-                timerType: "kosen" as TimerType,
-              },
-              {
-                title: "Program Timer",
-                href: "/program",
-                image: "/image/program_timer_icon_mobile.png",
-                timerType: "program" as TimerType,
-              },
+                  {
+                    title: "Judo Timer",
+                    href: "/judo",
+                    image: asset("/image/judo_timer_icon_mobile.png"),
+                    timerType: "judo" as TimerType,
+                  },
+                  {
+                    title: "Kosen Judo Timer",
+                    href: "/kosen",
+                    image: asset("/image/kosen_timer_icon_mobile.png"),
+                    timerType: "kosen" as TimerType,
+                  },
+                  {
+                    title: "Program Timer",
+                    href: "/program",
+                    image: asset("/image/program_timer_icon_mobile.png"),
+                    timerType: "program" as TimerType,
+                  },
             ].map((card) => (
               <button
                 key={card.title}
@@ -291,7 +292,7 @@ export default function HomePage() {
               }}
             >
               <Image
-                src="/image/recently_used_timer_mobile.png"
+                src={asset("/image/recently_used_timer_mobile.png")}
                 alt="Recently Used Timer"
                 style={{
                   width: "100%",
@@ -377,7 +378,7 @@ export default function HomePage() {
           }}
         >
           <Image
-            src="/image/GatameKosenJudo_logo.png"
+            src={asset("/image/GatameKosenJudo_logo.png")}
             alt="Gatame Kosen Judo Logo"
             fill
             style={{ objectFit: "contain" }}
@@ -493,7 +494,7 @@ export default function HomePage() {
               }}
             >
               <Image
-                src="/image/judo_timer_icon.png"
+                src={asset("/image/judo_timer_icon.png")}
                 alt="Judo Timer"
                 fill
                 style={{ objectFit: "contain" }}
@@ -547,7 +548,7 @@ export default function HomePage() {
               }}
             >
               <Image
-                src="/image/kosen_timer_icon.png"
+                src={asset("/image/kosen_timer_icon.png")}
                 alt="Kosen Timer"
                 fill
                 style={{ objectFit: "contain" }}
@@ -601,7 +602,7 @@ export default function HomePage() {
               }}
             >
               <Image
-                src="/image/program_timer_icon.png"
+                src={asset("/image/program_timer_icon.png")}
                 alt="Program Timer"
                 fill
                 style={{ objectFit: "contain" }}
@@ -656,7 +657,7 @@ export default function HomePage() {
               onClick={handleRecentlyUsedClick}
             >
               <Image
-                src="/image/recently_used_timer.png"
+                src={asset("/image/recently_used_timer.png")}
                 alt="Recently Used Timer"
                 fill
                 style={{ objectFit: "contain" }}

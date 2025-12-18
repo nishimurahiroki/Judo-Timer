@@ -1,6 +1,7 @@
-"use client";
+\"use client\";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from \"react\";
+import { asset } from \"../../src/lib/asset\";
 
 export type IpponOverlayProps = {
   visible: boolean;
@@ -72,7 +73,7 @@ export function IpponOverlay({ visible, winner, onClose }: IpponOverlayProps) {
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
-        src="/videos/ippon-win.mp4"
+        src={asset("/videos/ippon-win.mp4")}
         autoPlay
         playsInline
         muted={false}

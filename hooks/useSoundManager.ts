@@ -1,15 +1,16 @@
-"use client";
+\"use client\";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect } from \"react\";
+import { asset } from \"../src/lib/asset\";
 
 export type SoundKey = "timerStart" | "timerEnd" | "scoreWazaYuko";
 
 type SoundMap = Record<SoundKey, HTMLAudioElement>;
 
 const SOUND_PATHS: Record<SoundKey, string> = {
-  timerStart: "/sounds/timer-start.mp3",
-  timerEnd: "/sounds/timer-end.mp3",
-  scoreWazaYuko: "/sounds/score-waza-yuko.mp3",
+  timerStart: asset("/sounds/timer-start.mp3"),
+  timerEnd: asset("/sounds/timer-end.mp3"),
+  scoreWazaYuko: asset("/sounds/score-waza-yuko.mp3"),
 };
 
 export function useSoundManager(enabled: boolean) {

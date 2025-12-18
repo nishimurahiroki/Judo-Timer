@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Program } from "@/lib/programTimer/types";
+import { asset } from "../../src/lib/asset";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { createProgramFromTemplate, type TemplateId } from "@/lib/programTimer/templates";
@@ -269,7 +270,7 @@ export function ProgramTimerHome({
             }}
           >
             <Image
-              src="/image/program_timer_icon.png"
+              src={asset("/image/program_timer_icon.png")}
               alt="Program Timer"
               fill
               className="object-contain"
