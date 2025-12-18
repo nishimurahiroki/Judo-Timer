@@ -76,6 +76,8 @@ export function ProgramRunScreenMobile({
   const runSessionIdRef = useRef<string>(`session-${Date.now()}-${Math.random()}`);
   // Force-stop flag so that STOP/Pause immediately cancels any in-flight prep sound
   const prepForceStopRef = useRef<boolean>(false);
+  // Audio unlock flag for mobile autoplay restrictions
+  const audioUnlockedRef = useRef<boolean>(false);
   
   // Initialize prevRemainingSecRef with current remainingSec
   useEffect(() => {
@@ -253,49 +255,29 @@ export function ProgramRunScreenMobile({
     // The prep sound should continue playing even when transitioning to the next step
     // Only reset and play if the audio is not already playing
     // This ensures the sound continues uninterrupted across step transitions
-    
-    // ALWAYS create a NEW audio instance for each play attempt
-    // This is the most reliable way to ensure playback works
-    // Reusing the same instance can cause issues with browser autoplay policies
     try {
-      const newAudio = new Audio(asset("/sounds/timer-prep.mp3"));
-      newAudio.volume = 1.0;
-      newAudio.muted = false;
-      newAudio.currentTime = 0;
-      // 常に最新のインスタンスを参照できるよう、再生前にrefを更新しておく
-      prepAudioRef.current = newAudio;
-      
-      console.log("[timer-prep] 🎵 Creating NEW audio instance and playing:", {
-        volume: newAudio.volume,
-        muted: newAudio.muted,
-        src: newAudio.src,
-      });
-      
-      const playPromise = newAudio.play();
-      
+      audio.currentTime = 0;
+      const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
             // If STOP/Pause was pressed while play() was in-flight, immediately stop this instance
             if (prepForceStopRef.current) {
-              console.log("[timer-prep] Force-stop flag turned ON during play; stopping newAudio - stepKey:", stepKey);
-              newAudio.pause();
-              newAudio.currentTime = 0;
+              console.log("[timer-prep] Force-stop flag turned ON during play; stopping prep audio - stepKey:", stepKey);
+              audio.pause();
+              audio.currentTime = 0;
               return;
             }
             // Mark this step as played to prevent duplicates
             prepSoundPlayedForStepRef.current.add(stepKey);
-            console.log("[timer-prep] ✅✅✅ SUCCESS! Audio is playing! - stepKey:", stepKey);
+            console.log("[timer-prep] ✅✅✅ SUCCESS! Prep audio is playing! - stepKey:", stepKey);
             console.log("[timer-prep] Audio state:", {
-              volume: newAudio.volume,
-              muted: newAudio.muted,
-              paused: newAudio.paused,
-              currentTime: newAudio.currentTime,
-              duration: newAudio.duration,
+              volume: audio.volume,
+              muted: audio.muted,
+              paused: audio.paused,
+              currentTime: audio.currentTime,
+              duration: audio.duration,
             });
-            
-            // Store reference for potential cleanup
-            prepAudioRef.current = newAudio;
           })
           .catch((err) => {
             // AbortError is expected when pause() interrupts play() - ignore it
@@ -306,18 +288,12 @@ export function ProgramRunScreenMobile({
               return;
             }
             
-            console.error("[timer-prep] ❌❌❌ FAILED to play audio! - stepKey:", stepKey);
+            console.error("[timer-prep] ❌❌❌ FAILED to play prep audio! - stepKey:", stepKey);
             console.error("[timer-prep] Error:", {
               name: err.name,
               message: err.message,
               code: (err as any).code,
             });
-            console.error("[timer-prep] This usually means:");
-            console.error("  1. Browser autoplay policy blocked the sound");
-            console.error("  2. User interaction is required first");
-            console.error("  3. Audio file path is incorrect");
-            console.error("  4. Audio file is corrupted or unsupported format");
-            
             // Still mark as played to prevent duplicate attempts
             prepSoundPlayedForStepRef.current.add(stepKey);
           });
@@ -326,7 +302,7 @@ export function ProgramRunScreenMobile({
         prepSoundPlayedForStepRef.current.add(stepKey);
       }
     } catch (err) {
-      console.error("[timer-prep] ❌❌❌ EXCEPTION creating audio:", err);
+      console.error("[timer-prep] ❌❌❌ EXCEPTION playing prep audio:", err);
       prepSoundPlayedForStepRef.current.add(stepKey);
     }
   }, []);
@@ -439,12 +415,19 @@ export function ProgramRunScreenMobile({
   useEffect(() => {
     if (status === "finished" && !endSoundPlayed) {
       try {
-        const audio = endAudioRef.current || new Audio(asset("/sounds/timer-end.mp3"));
+        let audio = endAudioRef.current;
+        if (!audio) {
+          audio = new Audio(asset("/sounds/timer-end.mp3"));
+          audio.preload = "auto";
+          endAudioRef.current = audio;
+        }
         audio.currentTime = 0; // Reset to start
-        audio.play().catch((err) => {
-          console.error("Failed to play end sound:", err);
-        });
-        endAudioRef.current = audio;
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.error("Failed to play end sound:", err);
+          });
+        }
         setEndSoundPlayed(true);
       } catch (err) {
         console.error("Failed to play end sound:", err);
@@ -488,19 +471,39 @@ export function ProgramRunScreenMobile({
 
   // Unlock audio on user gesture (Start button) to bypass autoplay restrictions
   const unlockAudio = useCallback(() => {
-    if (prepAudioRef.current) {
-      const audio = prepAudioRef.current;
-      // Play then immediately pause/reset to unlock
-      audio.play()
-        .then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          console.log("[timer-prep] Audio unlocked via user gesture");
-        })
-        .catch((err) => {
-          console.error("[timer-prep] Failed to unlock audio:", err);
-        });
-    }
+    if (audioUnlockedRef.current) return;
+    audioUnlockedRef.current = true;
+
+    const audios: HTMLAudioElement[] = [];
+    if (readyAudioRef.current) audios.push(readyAudioRef.current);
+    if (endAudioRef.current) audios.push(endAudioRef.current);
+    if (prepAudioRef.current) audios.push(prepAudioRef.current);
+
+    audios.forEach((audio) => {
+      const originalMuted = audio.muted;
+      const originalVolume = audio.volume;
+      audio.muted = true;
+      audio.volume = 0;
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = originalMuted;
+            audio.volume = originalVolume;
+          })
+          .catch((err) => {
+            console.warn("[timer-audio] Failed to unlock audio instance:", err);
+            audio.muted = originalMuted;
+            audio.volume = originalVolume;
+          });
+      } else {
+        audio.muted = originalMuted;
+        audio.volume = originalVolume;
+      }
+    });
   }, []);
 
   // Toggle play/pause based on current status
