@@ -13,6 +13,13 @@ export const metadata: Metadata = {
   title: "Gatame Judo Timer",
   description:
     "Judo match timer, Kosen judo timer, and program training timer.",
+  viewport: {
+    width: "device-width",
+    initialScale: 1.0,
+    maximumScale: 1.0,
+    userScalable: false,
+    viewportFit: "cover",
+  },
 };
 
 export default function RootLayout({

@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { NAV_ICON_SRC } from "@/lib/navIcons";
 
 type MenuItem = "home" | "judo" | "kosen" | "program";
 
@@ -26,12 +27,12 @@ export function AppSidebar({
     label: string;
     item: MenuItem;
     iconType?: "home";
-    iconPath?: string;
+    iconSrc?: string;
   }> = [
     { href: "/", label: "Home", item: "home", iconType: "home" },
-    { href: "/judo", label: "Judo", item: "judo", iconPath: "/image/judo_timer_icon.png" },
-    { href: "/kosen", label: "Kosen", item: "kosen", iconPath: "/image/kosen_timer_icon.png" },
-    { href: "/program", label: "Program", item: "program", iconPath: "/image/program_timer_icon.png" },
+    { href: "/judo", label: "Judo", item: "judo", iconSrc: NAV_ICON_SRC.judo },
+    { href: "/kosen", label: "Kosen", item: "kosen", iconSrc: NAV_ICON_SRC.kosen },
+    { href: "/program", label: "Program", item: "program", iconSrc: NAV_ICON_SRC.program },
   ];
 
   // Drawer mode (mobile or PC drawer)
@@ -131,7 +132,7 @@ export function AppSidebar({
                     </svg>
                   ) : (
                     <Image
-                      src={item.iconPath!}
+                      src={item.iconSrc!}
                       alt={item.label}
                       fill
                       className="object-contain"
@@ -205,7 +206,7 @@ export function AppSidebar({
                 </svg>
               ) : (
                 <Image
-                  src={item.iconPath!}
+                  src={item.iconSrc!}
                   alt={item.label}
                   fill
                   className="object-contain"
