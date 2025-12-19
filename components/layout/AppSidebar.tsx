@@ -51,7 +51,7 @@ export function AppSidebar({
         />
         {/* Drawer */}
         <aside
-          className="fixed top-0 left-0 h-full bg-[#E4F4FF] flex flex-col shadow-xl"
+          className="fixed top-0 left-0 h-full flex flex-col shadow-xl"
           style={{
             width: isMobile ? "60vw" : "calc(100vw * (273 / 1440))",
             maxWidth: isMobile ? "60vw" : "calc(100vw * (273 / 1440))",
@@ -59,6 +59,7 @@ export function AppSidebar({
             transition: "transform 0.3s ease-in-out",
             borderRadius: "0 10px 10px 0",
             overflow: "hidden",
+            backgroundColor: "rgba(228, 244, 255, 0.9)",
           }}
         >
           {/* Close button */}

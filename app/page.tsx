@@ -184,7 +184,7 @@ export default function HomePage() {
           <h1
             className="text-white font-bold"
             style={{
-              fontSize: "clamp(14px, calc(100vw * (42 / 1080)), 28px)",
+              fontSize: "clamp(14px, calc(100vw * (60 / 1080)), 28px)",
             }}
           >
             Gatame Timer

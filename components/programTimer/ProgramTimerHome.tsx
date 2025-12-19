@@ -38,8 +38,8 @@ function TemplateCard({
       className="relative aspect-square flex-shrink-0"
       style={{ 
         // Mobile: 450/1080 ≈ 41.7vw, use 40-45vw range
-        width: isMobile ? "41.7vw" : "25vw",
-        maxWidth: isMobile ? "none" : "300px",
+        width: isMobile ? "41.7vw" : "20vw",
+        maxWidth: isMobile ? "none" : "240px",
         borderRadius: "10px",
         overflow: "hidden",
       }}
@@ -49,7 +49,7 @@ function TemplateCard({
         alt={title}
         fill
         className="object-cover"
-        sizes={isMobile ? "41.7vw" : "25vw"}
+        sizes={isMobile ? "41.7vw" : "20vw"}
         style={{ borderRadius: "10px" }}
       />
       {/* Start button - positioned bottom-right */}
@@ -89,8 +89,8 @@ function SavedTimerRow({
       className="flex items-center justify-between w-full bg-white border border-black rounded-md gap-4"
       style={{
         width: isMobile ? "86.9vw" : "100%",
-        height: isMobile ? "5.6vh" : "auto",
-        padding: isMobile ? "1.2vh 3vw" : "1.5vh 2vw",
+        height: isMobile ? "9vh" : "auto",
+        padding: isMobile ? "1.8vh 3vw" : "2vh 2.5vw",
       }}
     >
       <span
@@ -99,12 +99,12 @@ function SavedTimerRow({
       >
         {program.title || "Timer Name"}
       </span>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-4 flex-shrink-0">
         <button
           onClick={onStart}
           className="bg-[#00E467] text-white rounded-md font-semibold hover:bg-[#00D15A] transition-colors whitespace-nowrap"
           style={{
-            padding: isMobile ? "1.2vh 3vw" : "1vh 2vw",
+            padding: isMobile ? "1.0vh 2.5vw" : "1vh 2vw",
             fontSize: isMobile ? "clamp(3vw, 3.5vw, 4vw)" : "1.2vw",
           }}
         >
@@ -114,7 +114,7 @@ function SavedTimerRow({
           onClick={onEdit}
           className="bg-[#0044FF] text-white rounded-md font-semibold hover:bg-[#0033CC] transition-colors whitespace-nowrap"
           style={{
-            padding: isMobile ? "1.2vh 3vw" : "1vh 2vw",
+            padding: isMobile ? "1.0vh 2.5vw" : "1vh 2vw",
             fontSize: isMobile ? "clamp(3vw, 3.5vw, 4vw)" : "1.2vw",
           }}
         >
@@ -124,7 +124,7 @@ function SavedTimerRow({
           onClick={onDelete}
           className="bg-[#FFC5C5] text-black rounded-md font-semibold hover:bg-[#FFB0B0] transition-colors flex items-center gap-1 whitespace-nowrap"
           style={{
-            padding: isMobile ? "1.2vh 3vw" : "1vh 2vw",
+            padding: isMobile ? "1.0vh 2.5vw" : "1vh 2vw",
             fontSize: isMobile ? "clamp(3vw, 3.5vw, 4vw)" : "1.2vw",
           }}
         >
@@ -230,56 +230,54 @@ export function ProgramTimerHome({
         }}
       >
         <div className="flex items-center" style={{ gap: isMobile ? "3vw" : "2vw" }}>
-          {/* Hamburger menu button (mobile only) */}
-          {isMobile && (
+          {/* Hamburger menu button (PC & Mobile) */}
           <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="flex-shrink-0 text-white"
-              aria-label="Open menu"
-              style={{
-                width: "9vw",
-                height: "9vw",
-                minWidth: "30px",
-                minHeight: "30px",
-              }}
-            >
-              <svg
-                style={{ width: "100%", height: "100%" }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-          </button>
-          )}
-          
-          <div
-            className="relative flex-shrink-0"
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex-shrink-0 text-white"
+            aria-label="Open menu"
             style={{
-              width: "calc(100vh * (100 / 1024) * 0.6)",
-              height: "calc(100vh * (100 / 1024) * 0.6)",
+              width: isMobile ? "9vw" : "calc(100vw * (30 / 1440))",
+              height: isMobile ? "9vw" : "calc(100vw * (30 / 1440))",
+              minWidth: "30px",
+              minHeight: "30px",
+            }}
+          >
+            <svg
+              style={{ width: "100%", height: "100%" }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+          
+          <Link
+            href="/"
+            className="relative flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+            style={{
+              width: isMobile ? "calc(100vh * (178 / 1024)*0.6)" : "calc(100vh * (224 / 1024) * 0.6)",
+              height: isMobile ? "calc(100vh * (100 / 1024)*0.6)" : "calc(100vh * (126 / 1024) * 0.6)",
               aspectRatio: "1/1",
-              borderRadius: "10px",
               overflow: "hidden",
             }}
           >
             <Image
-              src={asset("/image/program_timer_icon.png")}
-              alt="Program Timer"
+              src={asset("/image/GatameKosenJudo_logo.png")}
+              alt="Gatame Kosen Judo Logo"
               fill
               className="object-contain"
             />
-          </div>
+          </Link>
           <span className="text-white font-semibold" style={{ fontSize: isMobile ? "clamp(1rem, 7vw, 1.5rem)" : "2.5vw" }}>
             Program Timer
-                        </span>
-                      </div>
+          </span>
+        </div>
       </header>
 
       {/* Main Layout: Sidebar + Content */}
@@ -290,12 +288,13 @@ export function ProgramTimerHome({
           minHeight: 0,
         }}
       >
-        {/* Sidebar (PC: fixed, Mobile: drawer) */}
+        {/* Sidebar (PC & Mobile: drawer) */}
         <AppSidebar
           activeItem="program"
           isMobile={isMobile}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          drawerMode={true}
         />
 
         {/* Main Content Area */}
@@ -362,8 +361,14 @@ export function ProgramTimerHome({
             <div 
               className="flex flex-row flex-wrap items-center justify-between flex-shrink-0"
               style={{ 
+                width: isMobile ? "95.4vw" : "calc(100vw * (1351 / 1440))",
+                maxWidth: isMobile ? "95.4vw" : "calc(100vw * (1351 / 1440))",
+                height: isMobile ? "0 auto" : "auto",
                 gap: "2vw",
-                marginBottom: isMobile ? "1vh" :"0vh",
+                marginTop: 0,
+                marginRight: 0,
+                marginLeft: 0,
+                marginBottom: isMobile ? "1vh" :"1vh",
               }}
             >
               <h2 
@@ -376,7 +381,7 @@ export function ProgramTimerHome({
                 onClick={handleCreateNew}
                 className="bg-[#0044FF] text-white rounded-md font-semibold hover:bg-[#0033CC] transition-colors whitespace-nowrap"
                 style={{ 
-                  padding:isMobile ? "1vh 2vw" : "1.5vh 2vw",
+                  padding:isMobile ? "1vh 2vw" : "2vh 2vw",
                   fontSize: isMobile ? "4vw" : "1.5vw",
                 }}
                         >
@@ -386,11 +391,12 @@ export function ProgramTimerHome({
 
             {/* Saved Timer List - Scrollable */}
             <div
-              className="overflow-y-auto border border-gray-300 rounded-lg bg-gray-50"
+              className="overflow-y-auto border border-gray-300 rounded-lg"
               style={{
-                width: isMobile ? "95.4vw" : "calc(100vw * (1138 / 1440))",
-                maxWidth: isMobile ? "95.4vw" : "calc(100vw * (1138 / 1440))",
-                height: isMobile ? "51vh" : "calc(100vh * (428 / 1024))",
+                backgroundColor: "#F2F4FF",
+                width: isMobile ? "95.4vw" : "calc(100vw * (1351 / 1440))",
+                maxWidth: isMobile ? "95.4vw" : "calc(100vw * (1351 / 1440))",
+                height: isMobile ? "51vh" : "calc(100vh * (484 / 1024))",
                 padding: isMobile ? "2vh 3vw" : "2vh 2vw",
                 margin: isMobile ? "0 auto" : undefined,
               }}
