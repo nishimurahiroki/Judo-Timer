@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Istok_Web } from "next/font/google";
+import Image from "next/image";
 import { useProgramTimer } from "@/hooks/useProgramTimer";
 import type { ProgramStep, Program } from "@/lib/programTimer/types";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
@@ -758,27 +759,29 @@ export function ProgramRunScreenMobile({
                 </svg>
               </button>
               {/* Home icon - outlined */}
-              <button
-                type="button"
-                onClick={goHome}
-                className="relative z-20 transition-transform duration-100 active:scale-95"
-                style={{ touchAction: "manipulation", pointerEvents: "auto" }}
-                aria-label="Home"
-              >
-                <svg
-                  className="w-8 h-8"
-                  fill="none"
-                  stroke="black"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
+              {status !== "finished" && (
+                <button
+                  type="button"
+                  onClick={goHome}
+                  className="relative z-20 transition-transform duration-100 active:scale-95"
+                  style={{ touchAction: "manipulation", pointerEvents: "auto" }}
+                  aria-label="Home"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    className="w-8 h-8"
+                    fill="none"
+                    stroke="black"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
             {/* Round label */}
             <span className="text-white text-center" style={{ fontSize: 'clamp(1.3rem, 2vw, 4rem)' }}>
@@ -821,79 +824,81 @@ export function ProgramRunScreenMobile({
           <div className="flex-1" />
 
           {/* Center: Back / Start / Skip buttons */}
-          <div className="flex flex-col items-center gap-0.5">
-            <div className="flex items-center justify-center gap-10">
-              {/* Back (Prev) button */}
-              <button
-                type="button"
-                onClick={prev}
-                className="w-12 h-12 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
-                style={{ touchAction: "auto" }}
-                aria-label="Previous round"
-              >
-                <svg
-                  className="w-10 h-10"
-                  fill="white"
-                  viewBox="0 0 24 24"
+          {status !== "finished" && (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center justify-center gap-10">
+                {/* Back (Prev) button */}
+                <button
+                  type="button"
+                  onClick={prev}
+                  className="w-12 h-12 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
+                  style={{ touchAction: "auto" }}
+                  aria-label="Previous round"
                 >
-                  <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                </svg>
-              </button>
+                  <svg
+                    className="w-10 h-10"
+                    fill="white"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  </svg>
+                </button>
 
-              {/* Start / Stop button */}
-              <button
-                type="button"
-                onClick={togglePlayPause}
-                className={`px-3 py-2.5 rounded-md text-white font-bold text-lg flex items-center gap-1.5 shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,0,0,0.1)] ${
-                  isRunning 
-                    ? "bg-[#FF4444] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(255,68,68,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(255,68,68,0.25)]" 
-                    : "bg-[#00FF88] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,255,136,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(0,255,136,0.25)]"
-                }`}
-                style={{ touchAction: "auto" }}
-              >
-                {isRunning ? (
-                  <>
-                    <svg
-                      className="w-8 h-8"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                    </svg>
-                    STOP
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-8 h-8"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    START
-                  </>
-                )}
-              </button>
-
-              {/* Skip (Next) button */}
-              <button
-                type="button"
-                onClick={next}
-                className="w-12 h-12 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
-                style={{ touchAction: "auto" }}
-                aria-label="Next round"
-              >
-                <svg
-                  className="w-10 h-10"
-                  fill="white"
-                  viewBox="0 0 24 24"
+                {/* Start / Stop button */}
+                <button
+                  type="button"
+                  onClick={togglePlayPause}
+                  className={`px-3 py-2.5 rounded-md text-white font-bold text-lg flex items-center gap-1.5 shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,0,0,0.1)] ${
+                    isRunning 
+                      ? "bg-[#FF4444] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(255,68,68,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(255,68,68,0.25)]" 
+                      : "bg-[#00FF88] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,255,136,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(0,255,136,0.25)]"
+                  }`}
+                  style={{ touchAction: "auto" }}
                 >
-                  <path d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-              </button>
+                  {isRunning ? (
+                    <>
+                      <svg
+                        className="w-8 h-8"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                      </svg>
+                      STOP
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-8 h-8"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      START
+                    </>
+                  )}
+                </button>
+
+                {/* Skip (Next) button */}
+                <button
+                  type="button"
+                  onClick={next}
+                  className="w-12 h-12 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
+                  style={{ touchAction: "auto" }}
+                  aria-label="Next round"
+                >
+                  <svg
+                    className="w-10 h-10"
+                    fill="white"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Right area: NEXT label */}
           <div className="flex-1 flex justify-start">
@@ -913,29 +918,48 @@ export function ProgramRunScreenMobile({
               backgroundColor: "rgba(255, 255, 255, 0.8)",
             }}
           >
-            {/* Home button - top-left */}
-            <button
-              type="button"
-              onClick={goHome}
-              className="absolute top-4 left-4 z-10 transition-transform duration-100 active:scale-95 pointer-events-auto"
-              style={{ touchAction: "auto" }}
-              aria-label="Home"
-            >
-              <svg
-                className="w-8 h-8 md:w-12 md:h-12"
-                fill="none"
-                stroke="black"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
+            {/* Reset and Home icons - top left */}
+            <div className="absolute top-4 left-4 flex flex-col gap-3 z-10">
+              {/* Reset icon */}
+              <button
+                type="button"
+                onClick={resetTimer}
+                className="w-9 h-9 rounded-full bg-[#00EEFF] flex items-center justify-center transition-transform duration-100 active:scale-95"
+                style={{ touchAction: "auto" }}
+                aria-label="Reset"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
-            </button>
-            
+                <svg
+                  className="w-8 h-8"
+                  fill="white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+                </svg>
+              </button>
+              {/* Home icon */}
+              <button
+                type="button"
+                onClick={goHome}
+                className="transition-transform duration-100 active:scale-95 pointer-events-auto"
+                style={{ touchAction: "auto" }}
+                aria-label="Home"
+              >
+                <svg
+                  className="w-8 h-8"
+                  fill="none"
+                  stroke="black"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                  />
+                </svg>
+              </button>
+            </div>
+
             {/* FINISH text - centered */}
             <div
               className="text-center"
@@ -1045,27 +1069,29 @@ export function ProgramRunScreenMobile({
               </svg>
             </button>
             {/* Home icon - outlined */}
-            <button
-              type="button"
-              onClick={goHome}
-              className="transition-transform duration-100 active:scale-95 relative z-20"
-              style={{ touchAction: "manipulation", pointerEvents: "auto" }}
-              aria-label="Home"
-            >
-              <svg
-                className="w-10 h-10"
-                fill="none"
-                stroke="black"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
+            {status !== "finished" && (
+              <button
+                type="button"
+                onClick={goHome}
+                className="transition-transform duration-100 active:scale-95 relative z-20"
+                style={{ touchAction: "manipulation", pointerEvents: "auto" }}
+                aria-label="Home"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-10 h-10"
+                  fill="none"
+                  stroke="black"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
           {/* Round label - white, with role/set info same as PC */}
           <span className="text-white text-center" style={{ fontSize: 'clamp(1.5rem, 3vw, 4rem)', lineHeight: 1.2 }}>
@@ -1103,89 +1129,91 @@ export function ProgramRunScreenMobile({
       </section>
 
       {/* Bottom area - Buttons and NEXT label */}
-      <footer className="px-4 pb-3 flex flex-col items-center gap-1 shrink-0 mb-15">
-        {/* Three buttons in a row */}
-        <div className="flex items-center justify-center gap-6">
-          {/* Back button - neon cyan */}
-          <button
-            type="button"
-            onClick={prev}
-            className="w-14 h-14 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
-            style={{ touchAction: "auto" }}
-            aria-label="Previous step"
-          >
-            <svg
-              className="w-12 h-12"
-              fill="white"
-              viewBox="0 0 24 24"
+      {status !== "finished" && (
+        <footer className="px-4 pb-3 flex flex-col items-center gap-1 shrink-0 mb-15">
+          {/* Three buttons in a row */}
+          <div className="flex items-center justify-center gap-6">
+            {/* Back button - neon cyan */}
+            <button
+              type="button"
+              onClick={prev}
+              className="w-14 h-14 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
+              style={{ touchAction: "auto" }}
+              aria-label="Previous step"
             >
-              <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-          </button>
+              <svg
+                className="w-12 h-12"
+                fill="white"
+                viewBox="0 0 24 24"
+              >
+                <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
 
-          {/* Start/Stop button - neon green/red */}
-          <button
-            type="button"
-            onClick={togglePlayPause}
-            className={`px-8 py-2 rounded-md text-white font-bold text-lg flex items-center gap-1 shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,0,0,0.1)] ${
-              isRunning 
-                ? "bg-[#FF4444] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(255,68,68,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(255,68,68,0.25)]" 
-                : "bg-[#00FF88] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,255,136,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(0,255,136,0.25)]"
-            }`}
-            style={{ touchAction: "auto" }}
-          >
-            {isRunning ? (
-              <>
-                <svg
-                  className="w-11 h-11"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                </svg>
-                STOP
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-11 h-11"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                START
-              </>
-            )}
-          </button>
-
-          {/* Skip button - neon cyan */}
-          <button
-            type="button"
-            onClick={next}
-            className="w-14 h-14 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
-            style={{ touchAction: "auto" }}
-            aria-label="Next step"
-          >
-            <svg
-              className="w-11 h-11"
-              fill="white"
-              viewBox="0 0 24 24"
+            {/* Start/Stop button - neon green/red */}
+            <button
+              type="button"
+              onClick={togglePlayPause}
+              className={`px-8 py-2 rounded-md text-white font-bold text-lg flex items-center gap-1 shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,0,0,0.1)] ${
+                isRunning 
+                  ? "bg-[#FF4444] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(255,68,68,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(255,68,68,0.25)]" 
+                  : "bg-[#00FF88] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,255,136,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(0,255,136,0.25)]"
+              }`}
+              style={{ touchAction: "auto" }}
             >
-              <path d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+              {isRunning ? (
+                <>
+                  <svg
+                    className="w-11 h-11"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                  STOP
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-11 h-11"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  START
+                </>
+              )}
+            </button>
 
-        {/* NEXT label - bottom right */}
-        {nextStep && (
-          <div className="self-end">
-            <span className="text-black text-md font-semibold">
-              NEXT: {getNextStepName()}
-            </span>
+            {/* Skip button - neon cyan */}
+            <button
+              type="button"
+              onClick={next}
+              className="w-14 h-14 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)]"
+              style={{ touchAction: "auto" }}
+              aria-label="Next step"
+            >
+              <svg
+                className="w-11 h-11"
+                fill="white"
+                viewBox="0 0 24 24"
+              >
+                <path d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-        )}
-      </footer>
+
+          {/* NEXT label - bottom right */}
+          {nextStep && (
+            <div className="self-end">
+              <span className="text-black text-md font-semibold">
+                NEXT: {getNextStepName()}
+              </span>
+            </div>
+          )}
+        </footer>
+      )}
 
       {/* Finished overlay - Portrait mode */}
       {status === "finished" && (
@@ -1195,9 +1223,25 @@ export function ProgramRunScreenMobile({
             backgroundColor: "rgba(255, 255, 255, 0.8)", // White with 80% opacity
           }}
         >
-          {/* Home buttons - top-left (two icons: black outline and light gray) */}
+          {/* Reset and Home icons - top left */}
           <div className="absolute top-4 left-4 flex flex-col gap-3 z-10">
-            {/* First Home icon - black outline */}
+            {/* Reset icon */}
+            <button
+              type="button"
+              onClick={resetTimer}
+              className="w-9 h-9 rounded-full bg-[#00EEFF] flex items-center justify-center transition-transform duration-100 active:scale-95"
+              style={{ touchAction: "auto" }}
+              aria-label="Reset"
+            >
+              <svg
+                className="w-8 h-8"
+                fill="white"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+              </svg>
+            </button>
+            {/* Home icon */}
             <button
               type="button"
               onClick={goHome}
@@ -1206,31 +1250,9 @@ export function ProgramRunScreenMobile({
               aria-label="Home"
             >
               <svg
-                className="w-10 h-10"
+                className="w-8 h-8"
                 fill="none"
                 stroke="black"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
-            </button>
-            {/* Second Home icon - light gray outline */}
-            <button
-              type="button"
-              onClick={goHome}
-              className="transition-transform duration-100 active:scale-95 pointer-events-auto opacity-40"
-              style={{ touchAction: "auto" }}
-              aria-label="Home"
-            >
-              <svg
-                className="w-10 h-10"
-                fill="none"
-                stroke="gray"
                 strokeWidth={2}
                 viewBox="0 0 24 24"
               >
@@ -1286,59 +1308,6 @@ export function ProgramRunScreenMobile({
         </div>
           )}
 
-          {/* Bottom buttons - keep existing buttons visible */}
-          <div className="absolute bottom-4 flex items-center justify-center gap-6">
-            {/* Back button */}
-            <button
-              type="button"
-              onClick={prev}
-              className="w-14 h-14 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)] pointer-events-auto"
-              style={{ touchAction: "auto" }}
-              aria-label="Previous step"
-            >
-              <svg
-                className="w-12 h-12"
-                fill="white"
-                viewBox="0 0 24 24"
-              >
-                <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-              </svg>
-            </button>
-
-            {/* Start button */}
-            <button
-              type="button"
-              onClick={togglePlayPause}
-              className="px-8 py-2 rounded-md text-white font-bold text-lg flex items-center gap-1 shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,0,0,0.1)] bg-[#00FF88] shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,255,136,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_12px_rgba(0,255,136,0.25)] pointer-events-auto"
-              style={{ touchAction: "auto" }}
-            >
-              <svg
-                className="w-11 h-11"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              START
-            </button>
-
-            {/* Skip button */}
-            <button
-              type="button"
-              onClick={next}
-              className="w-14 h-14 bg-[#00FFFF] rounded-md flex items-center justify-center shadow-[0_3px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,255,255,0.2)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_8px_rgba(0,255,255,0.15)] pointer-events-auto"
-              style={{ touchAction: "auto" }}
-              aria-label="Next step"
-            >
-              <svg
-                className="w-11 h-11"
-                fill="white"
-                viewBox="0 0 24 24"
-              >
-                <path d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
         </div>
       )}
       

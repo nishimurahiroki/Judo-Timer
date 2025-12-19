@@ -2,15 +2,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Istok_Web } from "next/font/google";
 import { useProgramTimer } from "@/hooks/useProgramTimer";
 import type { ProgramStep, Program } from "@/lib/programTimer/types";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
-import { formatTimerTitle } from "@/lib/programTimer/formatTitle";
-import { asset } from "@/lib/asset";
-import { useSoundManager } from "@/hooks/useSoundManager";
 
 const istokWeb = Istok_Web({
   weight: ["400", "700"],
@@ -37,9 +33,6 @@ export function ProgramRunScreen({
   onStatusChange,
   autoStart = false,
 }: ProgramRunScreenProps) {
-  const router = useRouter();
-  // ProgramTimer では常にサウンド有効として扱う（設定連動は既存仕様に影響しないよう変更しない）
-  const { play: playSound } = useSoundManager(true);
   const {
     status,
     currentStepIndex,
@@ -86,8 +79,6 @@ export function ProgramRunScreen({
   const prevRemainingSecRef = useRef<number>(remainingSec);
   // Run session ID for unique step keys
   const runSessionIdRef = useRef<string>(`session-${Date.now()}-${Math.random()}`);
-  // Force-stop flag so that STOP/Pause immediately cancels any in-flight prep sound
-  const prepForceStopRef = useRef<boolean>(false);
   
   // Initialize prevRemainingSecRef with current remainingSec
   useEffect(() => {
@@ -104,53 +95,25 @@ export function ProgramRunScreen({
   // Preload audio files on mount to prevent delay on first play
   useEffect(() => {
     // Preload ready_count.mp3
-    const readyAudio = new Audio(asset("/sounds/ready_count.mp3"));
+    const readyAudio = new Audio("/sounds/ready_count.mp3");
     readyAudio.preload = "auto";
     readyAudio.load(); // Force load
     readyAudioRef.current = readyAudio;
     
     // Preload timer-end.mp3
-    const endAudio = new Audio(asset("/sounds/timer-end.mp3"));
+    const endAudio = new Audio("/sounds/timer-end.mp3");
     endAudio.preload = "auto";
     endAudio.load(); // Force load
     endAudioRef.current = endAudio;
     
     // Preload timer-prep.mp3 - use single reusable instance (per spec)
     // Force: preload="auto", volume=1.0, muted=false
-    const prepAudio = new Audio(asset("/sounds/timer-prep.mp3"));
+    const prepAudio = new Audio("/sounds/timer-prep.mp3");
     prepAudio.preload = "auto";
     prepAudio.volume = 1.0;
     prepAudio.muted = false;
     prepAudio.load(); // Force load
     prepAudioRef.current = prepAudio;
-  }, []);
-
-  // Stop ALL sounds (ready, prep, end) – used on explicit user actions (STOP/RESET/RESTART)
-  const stopAllSounds = useCallback(() => {
-    if (readyAudioRef.current) {
-      try {
-        readyAudioRef.current.pause();
-        readyAudioRef.current.currentTime = 0;
-      } catch (e) {
-        console.warn("[timer-audio] Failed to stop ready sound:", e);
-      }
-    }
-    if (prepAudioRef.current) {
-      try {
-        prepAudioRef.current.pause();
-        prepAudioRef.current.currentTime = 0;
-      } catch (e) {
-        console.warn("[timer-audio] Failed to stop prep sound:", e);
-      }
-    }
-    if (endAudioRef.current) {
-      try {
-        endAudioRef.current.pause();
-        endAudioRef.current.currentTime = 0;
-      } catch (e) {
-        console.warn("[timer-audio] Failed to stop end sound:", e);
-      }
-    }
   }, []);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -190,6 +153,52 @@ export function ProgramRunScreen({
     return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
+  // Start ready overlay
+  const startReadyOverlay = useCallback(() => {
+    if (readyOverlayShown) return; // Already shown in this session
+    
+    setReadyActive(true);
+    setReadySecondsLeft(3);
+    setReadyOverlayShown(true);
+    // Reset end sound flag when starting a new run
+    setEndSoundPlayed(false);
+    
+    // Play audio - create new instance each time to avoid delay
+    try {
+      // Create new audio instance for immediate playback
+      const audio = new Audio("/sounds/ready_count.mp3");
+      audio.currentTime = 0;
+      
+      // Play immediately
+      audio.play().catch((err) => {
+        console.error("Failed to play ready audio:", err);
+      });
+      
+      // Also update ref for cleanup
+      readyAudioRef.current = audio;
+    } catch (err) {
+      console.error("Failed to play ready audio:", err);
+    }
+    
+    // Countdown interval
+    readyIntervalRef.current = setInterval(() => {
+      setReadySecondsLeft((prev) => {
+        if (prev <= 1) {
+          // Countdown finished
+          if (readyIntervalRef.current) {
+            clearInterval(readyIntervalRef.current);
+            readyIntervalRef.current = null;
+          }
+          setReadyActive(false);
+          // Start the timer
+          start();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [readyOverlayShown, start]);
+
   // Unlock audio on user gesture (Start button) to bypass autoplay restrictions
   const unlockAudio = useCallback(() => {
     if (prepAudioRef.current) {
@@ -210,28 +219,21 @@ export function ProgramRunScreen({
   // Toggle play/pause based on current status
   const togglePlayPause = () => {
     if (status === "idle" || status === "finished") {
-      // Userが新しいRunを開始するタイミングなので、過去の全サウンドを完全停止
-      stopAllSounds();
-      // New run starts: allow prep sound playback again
-      prepForceStopRef.current = false;
       // Unlock audio on user gesture (Start button)
       unlockAudio();
-      // JudoTimer と同じ開始サウンドを再生（ユーザー操作ハンドラ内で即時再生）
-      playSound("timerStart");
+      // Start ready overlay if not shown yet
+      if (!readyOverlayShown) {
+        startReadyOverlay();
+        return;
+      }
       // Reset end sound flag when starting a new run
       setEndSoundPlayed(false);
       // Reset run session ID
       runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
       start();
     } else if (status === "running") {
-      // STOP: ensure prep sound is force-stopped and cannot continue
-      prepForceStopRef.current = true;
-      // 進行中の全サウンド（ready/prep/end）を停止
-      stopAllSounds();
       pause();
     } else if (status === "paused") {
-      // Resume: allow prep sound playback again
-      prepForceStopRef.current = false;
       resume();
     }
   };
@@ -239,7 +241,7 @@ export function ProgramRunScreen({
   // Reset timer to beginning of current step
   const resetTimer = () => {
     reset();
-    // Reset ready overlay related state（countdown は廃止済みだが初期値に戻しておく）
+    // Reset ready overlay flag so it can show again
     setReadyOverlayShown(false);
     setReadyActive(false);
     setReadySecondsLeft(3);
@@ -247,8 +249,6 @@ export function ProgramRunScreen({
     prepSoundPlayedForStepRef.current.clear();
     runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
     prevRemainingSecRef.current = remainingSec;
-    // Also force-stop any prep sound
-    prepForceStopRef.current = true;
     // Clean up interval and audio
     if (readyIntervalRef.current) {
       clearInterval(readyIntervalRef.current);
@@ -258,59 +258,18 @@ export function ProgramRunScreen({
       readyAudioRef.current.pause();
       readyAudioRef.current = null;
     }
-    // 明示的なリセット時は全サウンドを完全停止
-    stopAllSounds();
-  };
-
-  // Navigate to home - fully stop timer and navigate (same as Mobile)
-  const goHome = useCallback(() => {
-    // Step 1: Stop the active timer
-    if (status === "running" || status === "paused") {
-      pause();
-    }
-    
-    // Step 2: Clear any setInterval
-    if (readyIntervalRef.current) {
-      clearInterval(readyIntervalRef.current);
-      readyIntervalRef.current = null;
-    }
-    
-    // Step 3: Force-stop all sounds and set force-stop flag
-    prepForceStopRef.current = true;
-    stopAllSounds();
-    
-    // Step 4: Stop any playing audio
-    if (readyAudioRef.current) {
-      readyAudioRef.current.pause();
-      readyAudioRef.current.currentTime = 0;
-      readyAudioRef.current = null;
-    }
     if (prepAudioRef.current) {
       prepAudioRef.current.pause();
       prepAudioRef.current.currentTime = 0;
     }
-    if (endAudioRef.current) {
-      endAudioRef.current.pause();
-      endAudioRef.current.currentTime = 0;
-      endAudioRef.current = null;
-    }
-    
-    // Step 5: Reset run-related state
-    reset();
-    setReadyOverlayShown(false);
-    setReadyActive(false);
-    setReadySecondsLeft(3);
-    setEndSoundPlayed(false);
-    prepSoundPlayedForStepRef.current.clear();
-    runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
-    
-    // Step 6: Navigate to ProgramTimerHome
+  };
+
+  // Navigate to home
+  const goHome = () => {
     if (onBackToHome) {
       onBackToHome();
-    } else {
-      router.push("/program");
     }
-  }, [status, pause, reset, stopAllSounds, router, onBackToHome]);
+  };
 
   // オーバーレイを開く（タイマーは継続）
   const openSettings = () => {
@@ -529,61 +488,66 @@ export function ProgramRunScreen({
     return setIndex;
   };
 
-  const computeSetProgress = (step: ProgramStep | null, stepIndex: number) => {
-    if (!step) return { currentSetIndex: 1, totalSetCount: 1 };
-
-    // Use setNumber if provided
-    const currentSetIndex = step.setNumber && step.setNumber > 0 ? step.setNumber : 1;
-
-    // Determine group key for total set count
-    const baseLabel = step.label?.trim() || `__round_${step.roundNumber ?? stepIndex + 1}`;
-    const groupKey = step.roleGroupId ? `${baseLabel}__rg_${step.roleGroupId}` : baseLabel;
-
-    let totalSetCount = 1;
-    const sameGroupSteps = steps.filter((s) => {
-      if (!s) return false;
-      const lbl = s.label?.trim() || `__round_${s.roundNumber ?? 0}`;
-      const key = s.roleGroupId ? `${lbl}__rg_${s.roleGroupId}` : lbl;
-      return key === groupKey;
-    });
-
-    if (sameGroupSteps.length > 0) {
-      const maxSetNumber = Math.max(
-        ...sameGroupSteps.map((s) => (s.setNumber && s.setNumber > 0 ? s.setNumber : 1)),
-      );
-      const fixedFromGroup = sameGroupSteps.find(
-        (s) => s.fixedSetsCount && s.fixedSetsCount > 0,
-      )?.fixedSetsCount;
-      totalSetCount = Math.max(maxSetNumber, fixedFromGroup ?? 1);
+  // Helper: Format label with Role-based display rules
+  const formatLabelWithPersonAndSet = (
+    step: ProgramStep | null,
+    stepIndex: number,
+  ): string => {
+    if (!step) {
+      return `Round ${stepIndex + 1}`;
     }
 
-    return { currentSetIndex, totalSetCount };
+    // Round番号を取得（roundNumberが設定されている場合はそれを使用、なければフォールバック）
+    const roundNumber = step.roundNumber ?? (stepIndex + 1);
+    const userLabel = step.label?.trim() || `Round ${roundNumber}`;
+    
+    // Check if this step has Role settings
+    const hasRoleSettings = step.roleGroupId !== undefined;
+    
+    if (hasRoleSettings) {
+      // Role-based display logic
+      const setsMode = step.setsMode || "fixed";
+      const personAlternationEnabled = step.personAlternationEnabled || false;
+      
+      // setNumberが設定されている場合はそれを使用（expand.tsで設定されている）
+      // なければ計算（フォールバック）
+      const currentSetNumber = step.setNumber !== undefined 
+        ? step.setNumber 
+        : getCurrentSetIndexForRole(
+            stepIndex,
+            step.roleGroupId,
+            personAlternationEnabled,
+          );
+      
+      // Round番号を使用（元のタイマー行のインデックス）
+      const roundDisplay = `Round ${roundNumber}`;
+      
+      // Person1,2がONの場合: Round {roundNumber} / Person{person} - {setNumber} set
+      if (personAlternationEnabled) {
+        const personLabel = step.side === "omote" ? "Person1" : "Person2";
+        return `${roundDisplay} / ${personLabel} - ${currentSetNumber} set`;
+      }
+      
+      // Person1,2がOFFの場合: Round {roundNumber} / {setNumber} set
+      return `${roundDisplay} / ${currentSetNumber} set`;
+    }
+    
+    // Legacy logic for non-Role timers
+    // ロールグループに属していないタイマーは、Person/Setラベルを表示しない
+    // 常に "Round {roundNumber}" のみを表示
+    return userLabel;
   };
 
-  // Get step name for display
+  // Get step name for display (format: "Round 1", "Round 2", etc. or user-specified name)
   const getStepName = () => {
-    const roundNumber = currentStep?.roundNumber ?? currentStepIndex + 1;
-    const { currentSetIndex, totalSetCount } = computeSetProgress(currentStep, currentStepIndex);
-    return formatTimerTitle({
-      step: currentStep,
-      roundIndex: roundNumber,
-      currentSetIndex,
-      totalSetCount,
-    });
+    return formatLabelWithPersonAndSet(currentStep, currentStepIndex);
   };
 
   // Get next step name for display
   const getNextStepName = () => {
     if (!nextStep) return "";
     const nextIndex = currentStepIndex + 1;
-    const roundNumber = nextStep.roundNumber ?? nextIndex + 1;
-    const { currentSetIndex, totalSetCount } = computeSetProgress(nextStep, nextIndex);
-    return formatTimerTitle({
-      step: nextStep,
-      roundIndex: roundNumber,
-      currentSetIndex,
-      totalSetCount,
-    });
+    return formatLabelWithPersonAndSet(nextStep, nextIndex);
   };
 
   // Get timer name (program title or default)
@@ -627,15 +591,12 @@ export function ProgramRunScreen({
     };
   }, [isUra]);
 
-  // Auto-start when autoStart is true (no pre-start overlay)
+  // Auto-start ready overlay when autoStart is true
   useEffect(() => {
     if (autoStart && status === "idle" && !readyOverlayShown) {
-      // 直接タイマー開始
-      setEndSoundPlayed(false);
-      runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
-      start();
+      startReadyOverlay();
     }
-  }, [autoStart, status, readyOverlayShown, start]);
+  }, [autoStart, status, readyOverlayShown, startReadyOverlay]);
 
   // Centralized prep sound playback function with comprehensive logging
   const playPrepSound = useCallback((stepKey: string, ctx: {
@@ -645,12 +606,6 @@ export function ProgramRunScreen({
     isPaused: boolean;
     isReadyOverlay: boolean;
   }) => {
-    // If force-stop is requested (e.g. user pressed STOP), do not start playback
-    if (prepForceStopRef.current) {
-      console.log("[timer-prep] Force-stop flag is ON, skipping playPrepSound for stepKey:", stepKey);
-      return;
-    }
-
     const audio = prepAudioRef.current;
     if (!audio) {
       console.error("[timer-prep] Audio instance not initialized");
@@ -677,12 +632,10 @@ export function ProgramRunScreen({
     // This is the most reliable way to ensure playback works
     // Reusing the same instance can cause issues with browser autoplay policies
     try {
-      const newAudio = new Audio(asset("/sounds/timer-prep.mp3"));
+      const newAudio = new Audio("/sounds/timer-prep.mp3");
       newAudio.volume = 1.0;
       newAudio.muted = false;
       newAudio.currentTime = 0;
-      // 常に最新のインスタンスを参照できるよう、再生前にrefを更新しておく
-      prepAudioRef.current = newAudio;
       
       console.log("[timer-prep] 🎵 Creating NEW audio instance and playing:", {
         volume: newAudio.volume,
@@ -695,13 +648,6 @@ export function ProgramRunScreen({
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // If STOP/Pause was pressed while play() was in-flight, immediately stop this instance
-            if (prepForceStopRef.current) {
-              console.log("[timer-prep] Force-stop flag turned ON during play; stopping newAudio - stepKey:", stepKey);
-              newAudio.pause();
-              newAudio.currentTime = 0;
-              return;
-            }
             // Mark this step as played to prevent duplicates
             prepSoundPlayedForStepRef.current.add(stepKey);
             console.log("[timer-prep] ✅✅✅ SUCCESS! Audio is playing! - stepKey:", stepKey);
@@ -717,14 +663,6 @@ export function ProgramRunScreen({
             prepAudioRef.current = newAudio;
           })
           .catch((err) => {
-            // AbortError is expected when pause() interrupts play() - ignore it
-            if (err.name === "AbortError" || err.message?.includes("interrupted")) {
-              console.log("[timer-prep] play() interrupted (likely by pause) - stepKey:", stepKey);
-              // Still mark as played to prevent duplicate attempts
-              prepSoundPlayedForStepRef.current.add(stepKey);
-              return;
-            }
-            
             console.error("[timer-prep] ❌❌❌ FAILED to play audio! - stepKey:", stepKey);
             console.error("[timer-prep] Error:", {
               name: err.name,
@@ -752,7 +690,7 @@ export function ProgramRunScreen({
   
   // Stop prep sound only on user Pause/Stop (not on normal step transitions)
   const stopPrepSound = useCallback(() => {
-    if (prepAudioRef.current) {
+    if (prepAudioRef.current && !prepAudioRef.current.paused) {
       prepAudioRef.current.pause();
       prepAudioRef.current.currentTime = 0;
       console.log("[timer-prep] Stopped by user pause/stop");
@@ -873,7 +811,7 @@ export function ProgramRunScreen({
   useEffect(() => {
     if (status === "finished" && !endSoundPlayed) {
       try {
-        const audio = endAudioRef.current || new Audio(asset("/sounds/timer-end.mp3"));
+        const audio = endAudioRef.current || new Audio("/sounds/timer-end.mp3");
         audio.currentTime = 0; // Reset to start
         audio.play().catch((err) => {
           console.error("Failed to play end sound:", err);
@@ -1101,6 +1039,42 @@ export function ProgramRunScreen({
         </div>
       </footer>
 
+      {/* Ready overlay */}
+      {readyActive && (
+        <div 
+          className="absolute inset-0 flex flex-col items-center justify-center z-[60] pointer-events-auto"
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.8)",
+          }}
+        >
+          {/* "Are you ready?" text */}
+          <div
+            className="text-center mb-8"
+            style={{
+              fontFamily: istokWeb.style.fontFamily,
+              fontSize: "clamp(3rem, 8vw, 8rem)",
+              fontWeight: 700,
+              color: "#0015FF",
+            }}
+          >
+            Are you ready?
+          </div>
+          
+          {/* Countdown number */}
+          <div
+            className="text-center"
+            style={{
+              fontFamily: istokWeb.style.fontFamily,
+              fontSize: "clamp(8rem, 20vw, 20rem)",
+              fontWeight: 700,
+              color: "#000000",
+            }}
+          >
+            {readySecondsLeft}
+          </div>
+        </div>
+      )}
+
       {/* Finish overlay */}
       {status === "finished" && (
         <div 
@@ -1153,7 +1127,6 @@ export function ProgramRunScreen({
       {isOverlayOpen && selectedProgram && (
         <ProgramCreateOverlay
           onClose={closeOverlay}
-          transparentBackground={true}
           onSave={(program, autoRun) => {
             // 実行モードではautoRunは無視
             if (isOverlayOpen && activeTimerId) {

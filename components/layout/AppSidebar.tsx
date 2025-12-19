@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { asset } from "@/lib/asset";
 
 type MenuItem = "home" | "judo" | "kosen" | "program";
 
@@ -30,9 +29,9 @@ export function AppSidebar({
     iconPath?: string;
   }> = [
     { href: "/", label: "Home", item: "home", iconType: "home" },
-    { href: "/judo", label: "Judo", item: "judo", iconPath: asset("/image/judo_timer_icon.png") },
-    { href: "/kosen", label: "Kosen", item: "kosen", iconPath: asset("/image/kosen_timer_icon.png") },
-    { href: "/program", label: "Program", item: "program", iconPath: asset("/image/program_timer_icon.png") },
+    { href: "/judo", label: "Judo", item: "judo", iconPath: "/image/judo_timer_icon.png" },
+    { href: "/kosen", label: "Kosen", item: "kosen", iconPath: "/image/kosen_timer_icon.png" },
+    { href: "/program", label: "Program", item: "program", iconPath: "/image/program_timer_icon.png" },
   ];
 
   // Drawer mode (mobile or PC drawer)
@@ -156,8 +155,11 @@ export function AppSidebar({
   // PC: fixed sidebar
   return (
     <aside
-      className="h-full bg-[#E4F4FF] flex flex-col"
-      style={{ width: "calc(100vw * (273 / 1440))" }}
+      className="h-full flex flex-col"
+      style={{ 
+        width: "calc(100vw * (273 / 1440))",
+        backgroundColor: "rgba(228, 244, 255, 0.9)",
+      }}
     >
       {menuItems.map((item) => {
         const isActive = item.item === activeItem;

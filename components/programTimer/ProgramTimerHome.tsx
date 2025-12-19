@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { Program } from "@/lib/programTimer/types";
@@ -163,6 +164,7 @@ export function ProgramTimerHome({
   onDeleteProgram,
   onSaveProgram,
 }: ProgramTimerHomeProps) {
+  const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -257,15 +259,18 @@ export function ProgramTimerHome({
             </svg>
           </button>
           
-          <Link
-            href="/"
-            className="relative flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="relative flex-shrink-0 transition-transform duration-100 active:scale-95"
             style={{
               width: isMobile ? "calc(100vh * (178 / 1024)*0.6)" : "calc(100vh * (224 / 1024) * 0.6)",
               height: isMobile ? "calc(100vh * (100 / 1024)*0.6)" : "calc(100vh * (126 / 1024) * 0.6)",
               aspectRatio: "1/1",
               overflow: "hidden",
+              touchAction: "auto",
             }}
+            aria-label="Home"
           >
             <Image
               src={asset("/image/GatameKosenJudo_logo.png")}
@@ -273,7 +278,7 @@ export function ProgramTimerHome({
               fill
               className="object-contain"
             />
-          </Link>
+          </button>
           <span className="text-white font-semibold" style={{ fontSize: isMobile ? "clamp(1rem, 7vw, 1.5rem)" : "2.5vw" }}>
             Program Timer
           </span>
