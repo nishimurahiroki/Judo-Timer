@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Istok_Web } from "next/font/google";
 import { useProgramTimer } from "@/hooks/useProgramTimer";
+import { useSoundManager } from "@/hooks/useSoundManager";
 import type { ProgramStep, Program } from "@/lib/programTimer/types";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
@@ -33,6 +34,20 @@ export function ProgramRunScreen({
   onStatusChange,
   autoStart = false,
 }: ProgramRunScreenProps) {
+  // Debug: Component mount/unmount tracking
+  useEffect(() => {
+    console.log("[ProgramRunScreen] mount", {
+      t: performance.now(),
+      timestamp: new Date().toISOString(),
+    });
+    
+    return () => {
+      console.log("[ProgramRunScreen] unmount", {
+        t: performance.now(),
+        timestamp: new Date().toISOString(),
+      });
+    };
+  }, []);
   const {
     status,
     currentStepIndex,
@@ -51,20 +66,26 @@ export function ProgramRunScreen({
   
   // status変更を親に通知
   useEffect(() => {
+    console.log("[StatusChange] status changed", {
+      t: performance.now(),
+      status,
+      currentStepIndex,
+      remainingSec,
+    });
+    
     if (onStatusChange) {
       onStatusChange(status);
     }
-  }, [status, onStatusChange]);
+  }, [status, onStatusChange, currentStepIndex, remainingSec]);
+  
+  // Sound manager for timer-start sound (shared with JudoTimer)
+  const { play: playSound, unlockAudio } = useSoundManager(true);
   
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
-
-  // Ready overlay state
-  const [readyActive, setReadyActive] = useState(false);
-  const [readySecondsLeft, setReadySecondsLeft] = useState(3);
-  const [readyOverlayShown, setReadyOverlayShown] = useState(false);
-  const readyIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const readyAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Track if timer-start sound has been played for this program run
+  const hasPlayedFirstStartSoundRef = useRef<boolean>(false);
 
   // End sound state
   const [endSoundPlayed, setEndSoundPlayed] = useState(false);
@@ -93,13 +114,8 @@ export function ProgramRunScreen({
   }, [currentStepIndex, remainingSec]);
   
   // Preload audio files on mount to prevent delay on first play
+  // Note: timer-start is now handled by useSoundManager (preloaded there)
   useEffect(() => {
-    // Preload ready_count.mp3
-    const readyAudio = new Audio("/sounds/ready_count.mp3");
-    readyAudio.preload = "auto";
-    readyAudio.load(); // Force load
-    readyAudioRef.current = readyAudio;
-    
     // Preload timer-end.mp3
     const endAudio = new Audio("/sounds/timer-end.mp3");
     endAudio.preload = "auto";
@@ -153,54 +169,9 @@ export function ProgramRunScreen({
     return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  // Start ready overlay
-  const startReadyOverlay = useCallback(() => {
-    if (readyOverlayShown) return; // Already shown in this session
-    
-    setReadyActive(true);
-    setReadySecondsLeft(3);
-    setReadyOverlayShown(true);
-    // Reset end sound flag when starting a new run
-    setEndSoundPlayed(false);
-    
-    // Play audio - create new instance each time to avoid delay
-    try {
-      // Create new audio instance for immediate playback
-      const audio = new Audio("/sounds/ready_count.mp3");
-      audio.currentTime = 0;
-      
-      // Play immediately
-      audio.play().catch((err) => {
-        console.error("Failed to play ready audio:", err);
-      });
-      
-      // Also update ref for cleanup
-      readyAudioRef.current = audio;
-    } catch (err) {
-      console.error("Failed to play ready audio:", err);
-    }
-    
-    // Countdown interval
-    readyIntervalRef.current = setInterval(() => {
-      setReadySecondsLeft((prev) => {
-        if (prev <= 1) {
-          // Countdown finished
-          if (readyIntervalRef.current) {
-            clearInterval(readyIntervalRef.current);
-            readyIntervalRef.current = null;
-          }
-          setReadyActive(false);
-          // Start the timer
-          start();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [readyOverlayShown, start]);
-
   // Unlock audio on user gesture (Start button) to bypass autoplay restrictions
-  const unlockAudio = useCallback(() => {
+  // This is for timer-prep sound only (timer-start uses useSoundManager)
+  const unlockPrepAudio = useCallback(() => {
     if (prepAudioRef.current) {
       const audio = prepAudioRef.current;
       // Play then immediately pause/reset to unlock
@@ -217,19 +188,26 @@ export function ProgramRunScreen({
   }, []);
 
   // Toggle play/pause based on current status
-  const togglePlayPause = () => {
+  const togglePlayPause = (e?: React.MouseEvent) => {
     if (status === "idle" || status === "finished") {
-      // Unlock audio on user gesture (Start button)
+      // CRITICAL: Unlock audio FIRST, synchronously within user gesture
+      // This must happen before any state updates or async operations
       unlockAudio();
-      // Start ready overlay if not shown yet
-      if (!readyOverlayShown) {
-        startReadyOverlay();
-        return;
+      
+      // Play timer-start sound (only once per program run)
+      if (!hasPlayedFirstStartSoundRef.current) {
+        playSound("timerStart");
+        hasPlayedFirstStartSoundRef.current = true;
       }
+      
+      // Unlock prep audio on user gesture (for timer-prep sound)
+      unlockPrepAudio();
+      
       // Reset end sound flag when starting a new run
       setEndSoundPlayed(false);
       // Reset run session ID
       runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
+      // Start timer immediately (no delay)
       start();
     } else if (status === "running") {
       pause();
@@ -241,23 +219,14 @@ export function ProgramRunScreen({
   // Reset timer to beginning of current step
   const resetTimer = () => {
     reset();
-    // Reset ready overlay flag so it can show again
-    setReadyOverlayShown(false);
-    setReadyActive(false);
-    setReadySecondsLeft(3);
     // Reset prep sound tracking and run session
     prepSoundPlayedForStepRef.current.clear();
     runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
     prevRemainingSecRef.current = remainingSec;
-    // Clean up interval and audio
-    if (readyIntervalRef.current) {
-      clearInterval(readyIntervalRef.current);
-      readyIntervalRef.current = null;
-    }
-    if (readyAudioRef.current) {
-      readyAudioRef.current.pause();
-      readyAudioRef.current = null;
-    }
+    // Reset start sound flag so it can play again on next start
+    hasPlayedFirstStartSoundRef.current = false;
+    
+    // Clean up prep audio
     if (prepAudioRef.current) {
       prepAudioRef.current.pause();
       prepAudioRef.current.currentTime = 0;
@@ -591,12 +560,23 @@ export function ProgramRunScreen({
     };
   }, [isUra]);
 
-  // Auto-start ready overlay when autoStart is true
+  // Auto-start timer when autoStart is true
+  // Note: timer-start sound will NOT play on autoStart due to mobile autoplay restrictions
+  // (requires user gesture), but we attempt it for consistency
   useEffect(() => {
-    if (autoStart && status === "idle" && !readyOverlayShown) {
-      startReadyOverlay();
+    if (autoStart && status === "idle") {
+      // Attempt to unlock and play (will likely fail on mobile without user gesture)
+      unlockAudio();
+      if (!hasPlayedFirstStartSoundRef.current) {
+        playSound("timerStart");
+        hasPlayedFirstStartSoundRef.current = true;
+      }
+      
+      setEndSoundPlayed(false);
+      runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
+      start();
     }
-  }, [autoStart, status, readyOverlayShown, startReadyOverlay]);
+  }, [autoStart, status, start, unlockAudio, playSound]);
 
   // Centralized prep sound playback function with comprehensive logging
   const playPrepSound = useCallback((stepKey: string, ctx: {
@@ -704,8 +684,8 @@ export function ProgramRunScreen({
   // When remainingSec reaches 0, useProgramTimer automatically advances to next step
   // So we detect the step transition as the signal that previous round ended
   useEffect(() => {
-    // Don't play during ready overlay or when finished/idle
-    if (readyActive || status === "finished" || status === "idle") {
+    // Don't play when finished/idle
+    if (status === "finished" || status === "idle") {
       prevStepIndexForSoundRef.current = currentStepIndex;
       return;
     }
@@ -726,7 +706,6 @@ export function ProgramRunScreen({
     const stepTransition = prevStepIndex !== currentStepIndex;
     const isForwardTransition = prevStepIndex < currentStepIndex;
     const isRunning = status === "running";
-    const isReadyOverlay = readyActive;
     
     // CRITICAL: Check if next step exists from PREVIOUS step index
     // When step transitions, currentStepIndex has already advanced, so nextStep might be null
@@ -752,19 +731,17 @@ export function ProgramRunScreen({
       nextStepExists: nextStep !== null,
       totalSteps,
       isRunning,
-      isReadyOverlay,
       alreadyPlayed: prepSoundPlayedForStepRef.current.has(stepKey),
     });
     
     // Trigger when step transitions forward (previous round ended, new round started)
     // CRITICAL: ONLY play if there is a next step to execute (do NOT play on last round)
-    // Exclude Ready overlay and dedupe with Set keyed by unique step key
+    // Dedupe with Set keyed by unique step key
     const shouldPlay = 
       isRunning && 
       stepTransition &&
       isForwardTransition &&  // Only play on forward transitions (automatic step advances)
       hasNextStep &&  // CRITICAL: Next Round must exist - do NOT play if this is the last round
-      !isReadyOverlay &&
       !prepSoundPlayedForStepRef.current.has(stepKey);
     
     if (shouldPlay) {
@@ -774,23 +751,21 @@ export function ProgramRunScreen({
         remainingSec,
         isRunning,
         isPaused: false,
-        isReadyOverlay,
+        isReadyOverlay: false,
       });
-    } else if (stepTransition && !hasNextStep && isRunning && !isReadyOverlay) {
+    } else if (stepTransition && !hasNextStep && isRunning) {
       console.log("[timer-prep] ⏸️ Step transition but NO NEXT ROUND - skipping prep sound (last round)");
     } else if (stepTransition && !isForwardTransition) {
       console.log("[timer-prep] ⏸️ Step transition but not forward (manual prev/next) - skipping prep sound");
     } else if (stepTransition && !isRunning) {
       console.log("[timer-prep] ⏸️ Step transition but not running - skipping prep sound");
-    } else if (stepTransition && isReadyOverlay) {
-      console.log("[timer-prep] ⏸️ Step transition but ready overlay active - skipping prep sound");
     } else if (stepTransition && prepSoundPlayedForStepRef.current.has(stepKey)) {
       console.log("[timer-prep] ⏸️ Step transition but already played for this step - skipping prep sound");
     }
     
     // Update previous step index AFTER checking transition
     prevStepIndexForSoundRef.current = currentStepIndex;
-  }, [currentStepIndex, currentStep?.id ?? null, nextStep, readyActive, status, remainingSec, playPrepSound, steps.length]);
+  }, [currentStepIndex, currentStep?.id ?? null, nextStep, status, remainingSec, playPrepSound, steps.length]);
   
   // Stop prep sound only on user Pause/Stop (not on normal step transitions)
   useEffect(() => {
@@ -825,15 +800,9 @@ export function ProgramRunScreen({
   }, [status, endSoundPlayed]);
 
   
-  // Cleanup ready overlay, prep sound, and end sound on unmount
+  // Cleanup prep sound, start sound, and end sound on unmount
   useEffect(() => {
     return () => {
-      if (readyIntervalRef.current) {
-        clearInterval(readyIntervalRef.current);
-      }
-      if (readyAudioRef.current) {
-        readyAudioRef.current.pause();
-      }
       if (prepAudioRef.current) {
         prepAudioRef.current.pause();
         prepAudioRef.current.currentTime = 0;
@@ -938,7 +907,7 @@ export function ProgramRunScreen({
         {/* MainTimer - 2x larger, centered */}
         <button
           type="button"
-          onClick={togglePlayPause}
+          onClick={(e) => togglePlayPause(e)}
           className="active:scale-95 transition-transform duration-100 focus:outline-none"
         >
           <div
@@ -979,7 +948,7 @@ export function ProgramRunScreen({
             {/* Start / Stop button - more neon/fluorescent */}
             <button
               type="button"
-              onClick={togglePlayPause}
+              onClick={(e) => togglePlayPause(e)}
               className={`px-5 py-4 rounded-md text-white font-bold text-2xl flex items-center gap-3 shadow-[0_4px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.1)] ${
                 isRunning 
                   ? "bg-[#FF4444] shadow-[0_4px_0_rgba(0,0,0,0.3),0_0_20px_rgba(255,68,68,0.3)] active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_15px_rgba(255,68,68,0.25)]" 
@@ -1038,42 +1007,6 @@ export function ProgramRunScreen({
           )}
         </div>
       </footer>
-
-      {/* Ready overlay */}
-      {readyActive && (
-        <div 
-          className="absolute inset-0 flex flex-col items-center justify-center z-[60] pointer-events-auto"
-          style={{
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-          }}
-        >
-          {/* "Are you ready?" text */}
-          <div
-            className="text-center mb-8"
-            style={{
-              fontFamily: istokWeb.style.fontFamily,
-              fontSize: "clamp(3rem, 8vw, 8rem)",
-              fontWeight: 700,
-              color: "#0015FF",
-            }}
-          >
-            Are you ready?
-          </div>
-          
-          {/* Countdown number */}
-          <div
-            className="text-center"
-            style={{
-              fontFamily: istokWeb.style.fontFamily,
-              fontSize: "clamp(8rem, 20vw, 20rem)",
-              fontWeight: 700,
-              color: "#000000",
-            }}
-          >
-            {readySecondsLeft}
-          </div>
-        </div>
-      )}
 
       {/* Finish overlay */}
       {status === "finished" && (

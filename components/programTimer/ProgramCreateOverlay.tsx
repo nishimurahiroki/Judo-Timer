@@ -572,14 +572,32 @@ function TimerRow({
     return () => window.removeEventListener("resize", updateRoundNameWidth);
   }, []);
 
+  // Mobile detection for fallback sizing
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Check container query support (use window.CSS to avoid conflict with @dnd-kit/utilities CSS)
+  const supportsContainerQueries = typeof window !== "undefined" && 
+    typeof window.CSS !== "undefined" && 
+    window.CSS.supports && 
+    window.CSS.supports("container-type", "inline-size");
+
   return (
     <div
       ref={setNodeRef}
       style={{
         ...style,
         backgroundColor: finalBackgroundColor,
+        containerType: "inline-size",
       }}
-      className="w-full rounded-lg shadow-md border border-gray-200 p-3 md:p-4 transition-colors"
+      className="timer-row-container w-full rounded-lg shadow-md border border-gray-200 p-3 md:p-4 transition-colors"
     >
       {/* Top row: Round Name input (mobile only) - left aligned */}
       <div className="flex items-center gap-2 mb-2 md:mb-0 md:hidden w-full">
@@ -593,7 +611,7 @@ function TimerRow({
       </div>
       
       {/* Main row: Controls and time display - single line on mobile */}
-      <div className="flex flex-row items-center gap-1 md:gap-4 w-full">
+      <div className="flex flex-row items-center gap-1 md:gap-4 w-full min-w-0 overflow-hidden flex-nowrap">
         {/* Left cluster: Menu + Checkbox + Number */}
         <div 
           ref={leftClusterRef}
@@ -646,26 +664,33 @@ function TimerRow({
         />
 
         {/* Center: Minus + Time + Plus - mobile: larger buttons and time */}
-        <div className="flex items-center gap-1 md:gap-4 flex-1 md:flex-shrink-0 md:ml-0 justify-center">
+        <div className="flex items-center gap-1 md:gap-4 flex-1 md:flex-shrink-0 md:ml-0 justify-center min-w-0">
           {/* (5) "-" button - mobile: larger */}
         <button
           type="button"
           onClick={handleDecrement}
             className="text-gray-800 text-3xl md:text-2xl font-bold hover:text-gray-600 transition-colors flex-shrink-0 min-w-[44px] md:min-w-0"
-            style={{ fontSize: "clamp(3rem, 4vw, 4rem)" }}
+            style={{ 
+              fontSize: supportsContainerQueries 
+                ? "clamp(2rem, 6cqi, 3.5rem)" 
+                : (isMobile ? "clamp(32px, 5vw, 56px)" : undefined)
+            }}
           aria-label="Decrement time"
         >
           −
         </button>
 
           {/* (6) Time display with "Tap" hint - mobile: as large as possible */}
-          <div className="flex flex-col items-center flex-shrink-0">
+          <div className="flex flex-col items-center flex-shrink-0 min-w-0">
           <button
             type="button"
             onClick={onOpenTimePicker}
-              className="font-mono font-bold text-black hover:text-gray-700 transition-colors cursor-pointer leading-none"
+              className="font-mono font-bold text-black hover:text-gray-700 transition-colors cursor-pointer leading-none min-w-0"
               style={{ 
-                fontSize: "clamp(2.5rem, 8vw, 4rem)",
+                fontSize: supportsContainerQueries 
+                  ? "clamp(2rem, 10cqi, 3.5rem)" 
+                  : (isMobile ? "clamp(32px, 8vw, 56px)" : undefined),
+                fontVariantNumeric: "tabular-nums",
               }}
             aria-label="Time display"
           >
@@ -683,7 +708,11 @@ function TimerRow({
           type="button"
           onClick={handleIncrement}
             className="text-gray-800 text-3xl md:text-2xl font-bold hover:text-gray-600 transition-colors flex-shrink-0 min-w-[44px] md:min-w-0"
-            style={{ fontSize: "clamp(3rem, 4vw, 4rem)" }}
+            style={{ 
+              fontSize: supportsContainerQueries 
+                ? "clamp(2rem, 6cqi, 3.5rem)" 
+                : (isMobile ? "clamp(32px, 5vw, 56px)" : undefined)
+            }}
           aria-label="Increment time"
         >
           +

@@ -40,6 +40,7 @@ export function useSoundManager(enabled: boolean) {
   }, []);
 
   // オーディオアンロック（ユーザー操作後に呼び出される）
+  // IMPORTANT: Must be called synchronously within user gesture context
   const unlockAudio = () => {
     if (audioUnlockedRef.current) {
       return;
@@ -52,37 +53,39 @@ export function useSoundManager(enabled: boolean) {
     }
 
     // すべてのオーディオインスタンスをアンロック
-    Object.values(audioMap).forEach((audio) => {
-      const originalMuted = audio.muted;
-      const originalVolume = audio.volume;
-      audio.muted = true;
-      audio.volume = 0;
+    // Use timerStart audio for unlock (most critical for first Start)
+    const timerStartAudio = audioMap.timerStart;
+    if (timerStartAudio) {
+      const originalMuted = timerStartAudio.muted;
+      const originalVolume = timerStartAudio.volume;
+      timerStartAudio.muted = true;
+      timerStartAudio.volume = 0;
+      timerStartAudio.currentTime = 0;
 
-      const playPromise = audio.play();
+      // Call play() synchronously - must not use setTimeout/requestAnimationFrame
+      const playPromise = timerStartAudio.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // 少し待ってからpause（AbortErrorを避けるため）
-            setTimeout(() => {
-              audio.pause();
-              audio.currentTime = 0;
-              audio.muted = originalMuted;
-              audio.volume = originalVolume;
-            }, 10);
+            // Immediately pause and reset - must be synchronous
+            timerStartAudio.pause();
+            timerStartAudio.currentTime = 0;
+            timerStartAudio.muted = originalMuted;
+            timerStartAudio.volume = originalVolume;
           })
           .catch((err) => {
             // AbortErrorは正常な動作なので無視
             if (err.name !== "AbortError" && process.env.NODE_ENV === "development") {
               console.warn("[useSoundManager] Failed to unlock audio:", err);
             }
-            audio.muted = originalMuted;
-            audio.volume = originalVolume;
+            timerStartAudio.muted = originalMuted;
+            timerStartAudio.volume = originalVolume;
           });
       } else {
-        audio.muted = originalMuted;
-        audio.volume = originalVolume;
+        timerStartAudio.muted = originalMuted;
+        timerStartAudio.volume = originalVolume;
       }
-    });
+    }
   };
 
   const play = (key: SoundKey): void => {
