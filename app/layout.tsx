@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Istok_Web } from "next/font/google";
+import { MobileZoomPrevention } from "@/components/layout/MobileZoomPrevention";
 import "./globals.css";
 
 const istokWeb = Istok_Web({
@@ -13,13 +14,15 @@ export const metadata: Metadata = {
   title: "Gatame Judo Timer",
   description:
     "Judo match timer, Kosen judo timer, and program training timer.",
-  viewport: {
-    width: "device-width",
-    initialScale: 1.0,
-    maximumScale: 1.0,
-    userScalable: false,
-    viewportFit: "cover",
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -30,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="ja" className={istokWeb.variable}>
       <body className="bg-black text-white">
+        <MobileZoomPrevention />
         <div className="min-h-screen flex flex-col">
           {/* 各ページがレイアウトを決めやすいように、mainはシンプルにしておく */}
           <main className="flex-1">

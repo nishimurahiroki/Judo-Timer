@@ -150,7 +150,33 @@ export function JudoTimerScreen({
     useState<AppSettings>(initialSettings);
 
   // サウンドマネージャー
-  const { play } = useSoundManager(settings.sound.enabled);
+  const { play, unlockAudio } = useSoundManager(settings.sound.enabled);
+  
+  // iPhone検出（オーディオアンロック用）
+  const isIPhoneRef = useRef<boolean | null>(null);
+  const audioUnlockedOnceRef = useRef(false);
+  
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+      isIPhoneRef.current = /iPhone/.test(navigator.userAgent);
+      
+      // iPhoneの場合、最初のtouchendイベントでオーディオをアンロック（フォールバック）
+      if (isIPhoneRef.current && !audioUnlockedOnceRef.current) {
+        const unlockOnce = () => {
+          if (!audioUnlockedOnceRef.current) {
+            unlockAudio();
+            audioUnlockedOnceRef.current = true;
+          }
+        };
+        
+        window.addEventListener("touchend", unlockOnce, { once: true });
+        
+        return () => {
+          window.removeEventListener("touchend", unlockOnce);
+        };
+      }
+    }
+  }, [unlockAudio]);
 
   // メイン試合タイマー（設定の mainTimerSeconds に追従）
   const { remainingSeconds, isRunning, start, stop, reset, adjustMainSeconds } =
@@ -608,6 +634,12 @@ export function JudoTimerScreen({
   };
 
   const handleMainTimerClick = () => {
+    // iPhone Safari: 最初のユーザー操作でオーディオをアンロック
+    if (isIPhoneRef.current && !audioUnlockedOnceRef.current && !isRunning) {
+      unlockAudio();
+      audioUnlockedOnceRef.current = true;
+    }
+
     if (isGoldenScore) {
       // GS 中はカウントアップの開始/停止のみ行う（GS ON/OFF は変えない）
       setIsGoldenRunning((prev) => {
