@@ -23,7 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { EditorRow, Program, RoleGroup } from "@/lib/programTimer/types";
 import { formatSecondsToTime } from "@/lib/programTimer/utils";
 import { generateUUID } from "@/lib/programTimer/expand";
-// import { useRoleSettingModalSize } from "@/hooks/useRoleSettingModalSize";
+import { useRoleSettingModalSize } from "@/hooks/useRoleSettingModalSize";
 
 type ProgramCreateOverlayProps = {
   onClose: () => void;
@@ -1785,10 +1785,7 @@ function RoleSettingPanel({
   }, []);
 
   // Use the new hook for stable modal sizing based on visible viewport
-  // Temporarily disabled to fix Turbopack build error
-  // const { style: modalStyle, dimensions } = useRoleSettingModalSize(isMobile);
-  const modalStyle: React.CSSProperties = {};
-  const dimensions = { vvWidth: 0, vvHeight: 0, finalWidth: 0, finalHeight: 0 };
+  const { style: modalStyle, dimensions } = useRoleSettingModalSize(isMobile);
 
   const searchParams = useSearchParams();
   const layoutDebug = searchParams?.get("layoutDebug") === "1";

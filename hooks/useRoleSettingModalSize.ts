@@ -8,7 +8,7 @@ import { useVisibleViewport } from "./useVisibleViewport";
  * Returns inline style object with pixel width/height.
  */
 export function useRoleSettingModalSize(isMobile: boolean) {
-  const { width: vvWidth, height: vvHeight } = useVisibleViewport();
+  const { vvW: vvWidth, vvH: vvHeight } = useVisibleViewport();
 
   const style = useMemo(() => {
     if (vvWidth === 0 || vvHeight === 0) {
