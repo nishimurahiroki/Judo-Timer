@@ -34,6 +34,11 @@ export function ProgramRunScreen({
   onStatusChange,
   autoStart = false,
 }: ProgramRunScreenProps) {
+  // iOS detection (client-side only)
+  const isIOS =
+    typeof navigator !== "undefined" &&
+    /iP(hone|od|ad)/.test(navigator.userAgent);
+
   // Debug: Component mount/unmount tracking
   useEffect(() => {
     console.log("[ProgramRunScreen] mount", {
@@ -79,7 +84,7 @@ export function ProgramRunScreen({
   }, [status, onStatusChange, currentStepIndex, remainingSec]);
   
   // Sound manager for timer-start sound (shared with JudoTimer)
-  const { play: playSound, unlockAudio } = useSoundManager(true);
+  const { play: playSound, unlockAudio, ensureUnlocked } = useSoundManager(true);
   
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
@@ -92,8 +97,6 @@ export function ProgramRunScreen({
   const endAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Prep sound state (transition sound when RoundTimer reaches 00:00)
-  // Use a single reusable audio instance (per spec)
-  const prepAudioRef = useRef<HTMLAudioElement | null>(null);
   // Track played steps using unique step key to prevent duplicates
   const prepSoundPlayedForStepRef = useRef<Set<string>>(new Set());
   // Track previous remainingSec to detect transition from >0 to 0
@@ -113,24 +116,7 @@ export function ProgramRunScreen({
     prevRemainingSecRef.current = remainingSec; // Reset to current value
   }, [currentStepIndex, remainingSec]);
   
-  // Preload audio files on mount to prevent delay on first play
-  // Note: timer-start is now handled by useSoundManager (preloaded there)
-  useEffect(() => {
-    // Preload timer-end.mp3
-    const endAudio = new Audio("/sounds/timer-end.mp3");
-    endAudio.preload = "auto";
-    endAudio.load(); // Force load
-    endAudioRef.current = endAudio;
-    
-    // Preload timer-prep.mp3 - use single reusable instance (per spec)
-    // Force: preload="auto", volume=1.0, muted=false
-    const prepAudio = new Audio("/sounds/timer-prep.mp3");
-    prepAudio.preload = "auto";
-    prepAudio.volume = 1.0;
-    prepAudio.muted = false;
-    prepAudio.load(); // Force load
-    prepAudioRef.current = prepAudio;
-  }, []);
+  // Note: timer sounds are now fully managed by useSoundManager (preloaded there)
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -169,39 +155,34 @@ export function ProgramRunScreen({
     return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  // Unlock audio on user gesture (Start button) to bypass autoplay restrictions
-  // This is for timer-prep sound only (timer-start uses useSoundManager)
-  const unlockPrepAudio = useCallback(() => {
-    if (prepAudioRef.current) {
-      const audio = prepAudioRef.current;
-      // Play then immediately pause/reset to unlock
-      audio.play()
-        .then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          console.log("[timer-prep] Audio unlocked via user gesture");
-        })
-        .catch((err) => {
-          console.error("[timer-prep] Failed to unlock audio:", err);
-        });
+  // iOS 専用: Start ボタンのタッチジェスチャ内でのみ開始音を鳴らす
+  // タイマーの開始/停止は一切行わない
+  const handleIOSStartSoundDirect = useCallback(() => {
+    if (!isIOS) return;
+    try {
+      // iOS: ensureUnlocked は timerStart とは別のサイレント音源でアンロックする
+      ensureUnlocked();
+      // このタップ内で timerStart を 1 回だけ再生
+      playSound("timerStart");
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[ProgramRunScreen][iOS] handleIOSStartSoundDirect error", err);
+      }
     }
-  }, []);
+  }, [isIOS, ensureUnlocked, playSound]);
 
-  // Toggle play/pause based on current status
+  // Toggle play/pause based on current status（タイマー状態の制御のみ）
   const togglePlayPause = (e?: React.MouseEvent) => {
     if (status === "idle" || status === "finished") {
       // CRITICAL: Unlock audio FIRST, synchronously within user gesture
       // This must happen before any state updates or async operations
       unlockAudio();
-      
-      // Play timer-start sound (only once per program run)
-      if (!hasPlayedFirstStartSoundRef.current) {
+
+      // 非 iOS のみ：ここで一度だけ開始音を鳴らす
+      if (!isIOS && !hasPlayedFirstStartSoundRef.current) {
         playSound("timerStart");
         hasPlayedFirstStartSoundRef.current = true;
       }
-      
-      // Unlock prep audio on user gesture (for timer-prep sound)
-      unlockPrepAudio();
       
       // Reset end sound flag when starting a new run
       setEndSoundPlayed(false);
@@ -225,12 +206,6 @@ export function ProgramRunScreen({
     prevRemainingSecRef.current = remainingSec;
     // Reset start sound flag so it can play again on next start
     hasPlayedFirstStartSoundRef.current = false;
-    
-    // Clean up prep audio
-    if (prepAudioRef.current) {
-      prepAudioRef.current.pause();
-      prepAudioRef.current.currentTime = 0;
-    }
   };
 
   // Navigate to home
@@ -561,121 +536,34 @@ export function ProgramRunScreen({
   }, [isUra]);
 
   // Auto-start timer when autoStart is true
-  // Note: timer-start sound will NOT play on autoStart due to mobile autoplay restrictions
-  // (requires user gesture), but we attempt it for consistency
+  // Note: timer-start sound will NOT play on autoStart on iOS due to autoplay restrictions
+  // (requires user gesture). For iOS, we only attempt unlock; soundは手動Start時のみ鳴らす
   useEffect(() => {
     if (autoStart && status === "idle") {
-      // Attempt to unlock and play (will likely fail on mobile without user gesture)
+      // Attempt to unlock (will likely fail on mobile without user gesture)
+      // IMPORTANT: autoStart では「手動スタート済み扱い」にしない（hasPlayedFirstStartSoundRef を触らない）
       unlockAudio();
-      if (!hasPlayedFirstStartSoundRef.current) {
+      if (!isIOS) {
+        // PC / Android では従来どおり autoStart 時にも timerStart を試みる
         playSound("timerStart");
-        hasPlayedFirstStartSoundRef.current = true;
       }
-      
+
       setEndSoundPlayed(false);
       runSessionIdRef.current = `session-${Date.now()}-${Math.random()}`;
       start();
     }
-  }, [autoStart, status, start, unlockAudio, playSound]);
+  }, [autoStart, status, start, unlockAudio, playSound, isIOS]);
 
-  // Centralized prep sound playback function with comprehensive logging
-  const playPrepSound = useCallback((stepKey: string, ctx: {
-    prevRemainingSec: number;
-    remainingSec: number;
-    isRunning: boolean;
-    isPaused: boolean;
-    isReadyOverlay: boolean;
-  }) => {
-    const audio = prepAudioRef.current;
-    if (!audio) {
-      console.error("[timer-prep] Audio instance not initialized");
-      return;
-    }
-    
-    // Log audio state before playback
-    console.log("[timer-prep] playPrepSound called:", {
-      stepKey,
-      src: audio.src,
-      muted: audio.muted,
-      volume: audio.volume,
-      paused: audio.paused,
-      currentTime: audio.currentTime,
-      ...ctx,
-    });
-    
-    // IMPORTANT: Do NOT stop currently playing prep sound
-    // The prep sound should continue playing even when transitioning to the next step
-    // Only reset and play if the audio is not already playing
-    // This ensures the sound continues uninterrupted across step transitions
-    
-    // ALWAYS create a NEW audio instance for each play attempt
-    // This is the most reliable way to ensure playback works
-    // Reusing the same instance can cause issues with browser autoplay policies
-    try {
-      const newAudio = new Audio("/sounds/timer-prep.mp3");
-      newAudio.volume = 1.0;
-      newAudio.muted = false;
-      newAudio.currentTime = 0;
-      
-      console.log("[timer-prep] 🎵 Creating NEW audio instance and playing:", {
-        volume: newAudio.volume,
-        muted: newAudio.muted,
-        src: newAudio.src,
-      });
-      
-      const playPromise = newAudio.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            // Mark this step as played to prevent duplicates
-            prepSoundPlayedForStepRef.current.add(stepKey);
-            console.log("[timer-prep] ✅✅✅ SUCCESS! Audio is playing! - stepKey:", stepKey);
-            console.log("[timer-prep] Audio state:", {
-              volume: newAudio.volume,
-              muted: newAudio.muted,
-              paused: newAudio.paused,
-              currentTime: newAudio.currentTime,
-              duration: newAudio.duration,
-            });
-            
-            // Store reference for potential cleanup
-            prepAudioRef.current = newAudio;
-          })
-          .catch((err) => {
-            console.error("[timer-prep] ❌❌❌ FAILED to play audio! - stepKey:", stepKey);
-            console.error("[timer-prep] Error:", {
-              name: err.name,
-              message: err.message,
-              code: (err as any).code,
-            });
-            console.error("[timer-prep] This usually means:");
-            console.error("  1. Browser autoplay policy blocked the sound");
-            console.error("  2. User interaction is required first");
-            console.error("  3. Audio file path is incorrect");
-            console.error("  4. Audio file is corrupted or unsupported format");
-            
-            // Still mark as played to prevent duplicate attempts
-            prepSoundPlayedForStepRef.current.add(stepKey);
-          });
-      } else {
-        console.warn("[timer-prep] ⚠️ play() returned undefined - stepKey:", stepKey);
-        prepSoundPlayedForStepRef.current.add(stepKey);
-      }
-    } catch (err) {
-      console.error("[timer-prep] ❌❌❌ EXCEPTION creating audio:", err);
+  // Centralized prep sound trigger (useSoundManager 管理下の timerPrep を再生)
+  const triggerPrepSound = useCallback(
+    (stepKey: string) => {
+      // 重複防止は従来どおり stepKey セットで管理
+      if (prepSoundPlayedForStepRef.current.has(stepKey)) return;
       prepSoundPlayedForStepRef.current.add(stepKey);
-    }
-  }, []);
-  
-  // Stop prep sound only on user Pause/Stop (not on normal step transitions)
-  const stopPrepSound = useCallback(() => {
-    if (prepAudioRef.current && !prepAudioRef.current.paused) {
-      prepAudioRef.current.pause();
-      prepAudioRef.current.currentTime = 0;
-      console.log("[timer-prep] Stopped by user pause/stop");
-    }
-  }, []);
+      playSound("timerPrep");
+    },
+    [playSound],
+  );
   
   // Track previous step index to detect step transitions
   const prevStepIndexForSoundRef = useRef<number>(currentStepIndex);
@@ -719,21 +607,6 @@ export function ProgramRunScreen({
     const hasNextStep = nextStep !== null || hasNextStepFromPrev;
     
     // Log for debugging
-    console.log("[timer-prep] Step transition check:", {
-      stepKey,
-      prevStepIndex,
-      currentStepIndex,
-      stepTransition,
-      isForwardTransition,
-      remainingSec,
-      hasNextStep,
-      hasNextStepFromPrev,
-      nextStepExists: nextStep !== null,
-      totalSteps,
-      isRunning,
-      alreadyPlayed: prepSoundPlayedForStepRef.current.has(stepKey),
-    });
-    
     // Trigger when step transitions forward (previous round ended, new round started)
     // CRITICAL: ONLY play if there is a next step to execute (do NOT play on last round)
     // Dedupe with Set keyed by unique step key
@@ -745,74 +618,24 @@ export function ProgramRunScreen({
       !prepSoundPlayedForStepRef.current.has(stepKey);
     
     if (shouldPlay) {
-      console.log("[timer-prep] ✅✅✅ SHOULD PLAY - Previous round ended, new round started - Calling playPrepSound - stepKey:", stepKey);
-      playPrepSound(stepKey, {
-        prevRemainingSec: 0,
-        remainingSec,
-        isRunning,
-        isPaused: false,
-        isReadyOverlay: false,
-      });
-    } else if (stepTransition && !hasNextStep && isRunning) {
-      console.log("[timer-prep] ⏸️ Step transition but NO NEXT ROUND - skipping prep sound (last round)");
-    } else if (stepTransition && !isForwardTransition) {
-      console.log("[timer-prep] ⏸️ Step transition but not forward (manual prev/next) - skipping prep sound");
-    } else if (stepTransition && !isRunning) {
-      console.log("[timer-prep] ⏸️ Step transition but not running - skipping prep sound");
-    } else if (stepTransition && prepSoundPlayedForStepRef.current.has(stepKey)) {
-      console.log("[timer-prep] ⏸️ Step transition but already played for this step - skipping prep sound");
+      triggerPrepSound(stepKey);
     }
     
     // Update previous step index AFTER checking transition
     prevStepIndexForSoundRef.current = currentStepIndex;
-  }, [currentStepIndex, currentStep?.id ?? null, nextStep, status, remainingSec, playPrepSound, steps.length]);
+  }, [currentStepIndex, currentStep?.id ?? null, nextStep, status, remainingSec, triggerPrepSound, steps.length]);
   
-  // Stop prep sound only on user Pause/Stop (not on normal step transitions)
-  useEffect(() => {
-    // Only stop on explicit pause/stop, not on step transitions
-    // Step transitions keep status === "running", so we only stop when status changes to paused/idle/finished
-    // Use a small delay to avoid interrupting play() calls that happen during step transitions
-    if (status === "paused" || status === "idle" || status === "finished") {
-      // Use setTimeout to avoid interrupting play() calls that might be in progress
-      const timeoutId = setTimeout(() => {
-        stopPrepSound();
-      }, 100); // Small delay to let play() complete
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [status, stopPrepSound]);
+  // Prep sound is now short one-shot; no explicit stop hook required
   
   // Play end sound when program finishes
   useEffect(() => {
     if (status === "finished" && !endSoundPlayed) {
-      try {
-        const audio = endAudioRef.current || new Audio("/sounds/timer-end.mp3");
-        audio.currentTime = 0; // Reset to start
-        audio.play().catch((err) => {
-          console.error("Failed to play end sound:", err);
-        });
-        endAudioRef.current = audio;
-        setEndSoundPlayed(true);
-      } catch (err) {
-        console.error("Failed to play end sound:", err);
-      }
+      playSound("timerEnd");
+      setEndSoundPlayed(true);
     }
-  }, [status, endSoundPlayed]);
+  }, [status, endSoundPlayed, playSound]);
 
   
-  // Cleanup prep sound, start sound, and end sound on unmount
-  useEffect(() => {
-    return () => {
-      if (prepAudioRef.current) {
-        prepAudioRef.current.pause();
-        prepAudioRef.current.currentTime = 0;
-      }
-      if (endAudioRef.current) {
-        endAudioRef.current.pause();
-      }
-    };
-  }, []);
-
   return (
     <div 
       className={`w-full h-full flex flex-col text-white ${istokWeb.className} overflow-hidden`}
@@ -948,6 +771,7 @@ export function ProgramRunScreen({
             {/* Start / Stop button - more neon/fluorescent */}
             <button
               type="button"
+              onTouchStart={isIOS ? handleIOSStartSoundDirect : undefined}
               onClick={(e) => togglePlayPause(e)}
               className={`px-5 py-4 rounded-md text-white font-bold text-2xl flex items-center gap-3 shadow-[0_4px_0_rgba(0,0,0,0.3),0_0_15px_rgba(0,0,0,0.15)] transition-transform duration-100 active:translate-y-1 active:shadow-[0_2px_0_rgba(0,0,0,0.3),0_0_10px_rgba(0,0,0,0.1)] ${
                 isRunning 

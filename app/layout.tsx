@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Istok_Web } from "next/font/google";
 import { MobileZoomPrevention } from "@/components/layout/MobileZoomPrevention";
+import { AudioAuditInstaller } from "@/components/dev/AudioAuditInstaller";
 import "./globals.css";
 
 const istokWeb = Istok_Web({
@@ -34,6 +35,8 @@ export default function RootLayout({
     <html lang="ja" className={istokWeb.variable}>
       <body className="bg-black text-white">
         <MobileZoomPrevention />
+        {/* 開発時のみ有効なオーディオ監査フック（UIには影響しない） */}
+        <AudioAuditInstaller />
         <div className="min-h-screen flex flex-col">
           {/* 各ページがレイアウトを決めやすいように、mainはシンプルにしておく */}
           <main className="flex-1">
