@@ -37,7 +37,8 @@ const getIOSUnlockAudio = (): HTMLAudioElement | null => {
     // GitHub Pages の basePath 対応のため asset() を通す
     iosUnlockAudio = new Audio(asset("/sounds/silence.mp3"));
     iosUnlockAudio.preload = "auto";
-    iosUnlockAudio.playsInline = true;
+    iosUnlockAudio.setAttribute("playsinline", "");
+    iosUnlockAudio.setAttribute("webkit-playsinline", "");
     iosUnlockAudio.muted = true;
     iosUnlockAudio.volume = 0;
     return iosUnlockAudio;
@@ -97,7 +98,8 @@ export function useSoundManager(enabled: boolean) {
     (Object.keys(SOUND_PATHS) as SoundKey[]).forEach((key) => {
       const audio = new Audio(SOUND_PATHS[key]);
       audio.preload = "auto";
-      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.setAttribute("webkit-playsinline", "");
       audioMap[key] = audio;
     });
 
