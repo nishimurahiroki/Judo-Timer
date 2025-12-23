@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -22,6 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { EditorRow, Program, RoleGroup } from "@/lib/programTimer/types";
 import { formatSecondsToTime } from "@/lib/programTimer/utils";
 import { generateUUID } from "@/lib/programTimer/expand";
+// import { useRoleSettingModalSize } from "@/hooks/useRoleSettingModalSize";
 
 type ProgramCreateOverlayProps = {
   onClose: () => void;
@@ -1782,39 +1784,61 @@ function RoleSettingPanel({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Use the new hook for stable modal sizing based on visible viewport
+  // Temporarily disabled to fix Turbopack build error
+  // const { style: modalStyle, dimensions } = useRoleSettingModalSize(isMobile);
+  const modalStyle: React.CSSProperties = {};
+  const dimensions = { vvWidth: 0, vvHeight: 0, finalWidth: 0, finalHeight: 0 };
+
+  const searchParams = useSearchParams();
+  const layoutDebug = searchParams?.get("layoutDebug") === "1";
+
   if (!isOpen) return null;
 
-  // Mobile: 20% larger (1.2x), PC: original size
+  // Fallback CSS values (used when modalStyle is not yet computed)
   const modalWidth = isMobile 
-    ? "min(72vw, 72vh * 631 / 681)" // 60vw * 1.2 = 72vw, 60vh * 1.2 = 72vh
+    ? "min(72vw, 72vh * 631 / 681)"
     : "min(60vw, 60vh * 631 / 681)";
-  const modalMaxWidth = isMobile 
-    ? "600px" // 500px * 1.2 = 600px, but ensure it fits viewport
-    : "500px";
-  const modalMaxHeight = isMobile 
-    ? "90vh" // Ensure it fits within viewport
-    : "90vh";
-  
-  // Mobile: increase height by 20% (adjust aspectRatio)
-  // Original: 631 / 681, Height increase by 20%: 681 * 1.2 = 817.2
-  // New aspectRatio: 631 / 817.2 ≈ 631 / 817
+  const modalMaxWidth = isMobile ? "600px" : "500px";
+  const modalMaxHeight = isMobile ? "90vh" : "90vh";
   const modalAspectRatio = isMobile ? "631 / 817" : "631 / 681";
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      style={{
+        paddingTop: `calc(env(safe-area-inset-top) + 1rem)`,
+        paddingBottom: `calc(env(safe-area-inset-bottom) + 1rem)`,
+      }}
       onClick={handleBackdropClick}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl relative"
+        className="bg-white rounded-2xl shadow-2xl relative overflow-hidden"
         style={{
-          aspectRatio: modalAspectRatio,
-          width: modalWidth,
-          maxWidth: modalMaxWidth,
-          maxHeight: modalMaxHeight,
+          ...(modalStyle && Object.keys(modalStyle).length > 0
+            ? {
+                ...modalStyle,
+                maxWidth: modalMaxWidth,
+              }
+            : {
+                aspectRatio: modalAspectRatio,
+                width: modalWidth,
+                maxWidth: modalMaxWidth,
+                maxHeight: modalMaxHeight,
+              }),
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {layoutDebug && dimensions && (
+          <div
+            className="absolute bottom-2 left-2 z-10 rounded bg-black/70 text-white text-[10px] px-2 py-1 font-mono"
+          >
+            <div>{`vv: ${Math.round(dimensions.vvWidth)}x${Math.round(dimensions.vvHeight)}`}</div>
+            <div>{`modal: ${Math.round(dimensions.finalWidth)}x${Math.round(dimensions.finalHeight)}`}</div>
+            <div>{`aspect: ${dimensions.finalWidth > 0 && dimensions.finalHeight > 0 ? (dimensions.finalWidth / dimensions.finalHeight).toFixed(3) : "N/A"}`}</div>
+          </div>
+        )}
+
         {/* 内側の影効果 */}
         <div className="absolute inset-0 rounded-2xl shadow-inner pointer-events-none" />
 
@@ -1848,74 +1872,77 @@ function RoleSettingPanel({
             </button>
           </div>
 
-          {/* Sets行 */}
-          <div className="mb-6 flex-shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-base font-medium text-black">Sets</span>
-              <div className="flex flex-col items-end gap-2">
-                {/* Infinity toggle button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSetsModeChange(setsMode === "infinite" ? "fixed" : "infinite");
-                  }}
-                  className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
-                    setsMode === "infinite"
-                      ? "bg-[#0015FF] text-white"
-                      : "bg-white text-black border border-gray-300"
-                  }`}
-                >
-                  <span className="text-2xl font-bold">∞</span>
-                </button>
-                {/* Numeric input */}
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={setsMode === "fixed" ? displayValue : ""}
-                  onChange={handleFixedSetsCountChange}
-                  onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
-                  disabled={setsMode === "infinite"}
-                  placeholder="1"
-                  className={`w-20 px-3 py-2 rounded-lg border text-center text-base ${
-                    setsMode === "infinite"
-                      ? "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
-                      : "bg-white border-gray-300"
-                  }`}
-                  style={{
-                    color: setsMode === "infinite" 
-                      ? "#9CA3AF" 
-                      : (fixedSetsCount === 1 && !isUserValue && displayValue === "1")
-                        ? "#AAA9A9"
-                        : "#000000"
-                  }}
-                />
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-auto">
+            {/* Sets行 */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-base font-medium text-black">Sets</span>
+                <div className="flex flex-col items-end gap-2">
+                  {/* Infinity toggle button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSetsModeChange(setsMode === "infinite" ? "fixed" : "infinite");
+                    }}
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+                      setsMode === "infinite"
+                        ? "bg-[#0015FF] text-white"
+                        : "bg-white text-black border border-gray-300"
+                    }`}
+                  >
+                    <span className="text-2xl font-bold">∞</span>
+                  </button>
+                  {/* Numeric input */}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={setsMode === "fixed" ? displayValue : ""}
+                    onChange={handleFixedSetsCountChange}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    disabled={setsMode === "infinite"}
+                    placeholder="1"
+                    className={`w-20 px-3 py-2 rounded-lg border text-center text-base ${
+                      setsMode === "infinite"
+                        ? "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
+                        : "bg-white border-gray-300"
+                    }`}
+                    style={{
+                      color: setsMode === "infinite" 
+                        ? "#9CA3AF" 
+                        : (fixedSetsCount === 1 && !isUserValue && displayValue === "1")
+                          ? "#AAA9A9"
+                          : "#000000"
+                    }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* セパレーター線 */}
-          <div className="h-px bg-gray-300 mb-6 flex-shrink-0" />
+            {/* セパレーター線 */}
+            <div className="h-px bg-gray-300 mb-6" />
 
-          {/* Person1,2行 */}
-          <div className="mb-6 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-base font-medium text-black">Person1,2</span>
-              {/* Toggle button */}
-              <button
-                type="button"
-                onClick={() => onPersonAlternationChange(!personAlternationEnabled)}
-                className={`relative w-14 h-7 rounded-full transition-colors ${
-                  personAlternationEnabled ? "bg-green-500" : "bg-gray-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                    personAlternationEnabled ? "translate-x-7" : "translate-x-0"
+            {/* Person1,2行 */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between">
+                <span className="text-base font-medium text-black">Person1,2</span>
+                {/* Toggle button */}
+                <button
+                  type="button"
+                  onClick={() => onPersonAlternationChange(!personAlternationEnabled)}
+                  className={`relative w-14 h-7 rounded-full transition-colors ${
+                    personAlternationEnabled ? "bg-green-500" : "bg-gray-300"
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                      personAlternationEnabled ? "translate-x-7" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
 

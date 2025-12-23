@@ -36,9 +36,9 @@ export default function JudoPage() {
           <JudoTimerScreen initialSettings={DEFAULT_SETTINGS} />
         </FitToScreenContainer>
       ) : (
-        <JudoTimerScaledContainer>
-          <JudoTimerScreen initialSettings={DEFAULT_SETTINGS} />
-        </JudoTimerScaledContainer>
+    <JudoTimerScaledContainer>
+      <JudoTimerScreen initialSettings={DEFAULT_SETTINGS} />
+    </JudoTimerScaledContainer>
       )}
       <A2HSNotice />
     </>

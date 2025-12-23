@@ -2,6 +2,8 @@
 // グローバルに HTMLMediaElement.play と Audio コンストラクタをフックして
 // どこから音が鳴っているかを開発時だけログ出力する。
 
+"use client";
+
 export function installAudioAudit() {
   if (process.env.NODE_ENV !== "development") return;
   if (typeof window === "undefined") return;

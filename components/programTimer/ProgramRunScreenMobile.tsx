@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Istok_Web } from "next/font/google";
 import Image from "next/image";
 import { useProgramTimer } from "@/hooks/useProgramTimer";
@@ -12,6 +12,7 @@ import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
 import { formatTimerTitle } from "@/lib/programTimer/formatTitle";
 import { asset } from "@/lib/asset";
 import { useSoundManager } from "@/hooks/useSoundManager";
+import { useVisibleViewport } from "@/hooks/useVisibleViewport";
 
 const istokWeb = Istok_Web({
   weight: ["400", "700"],
@@ -96,23 +97,127 @@ export function ProgramRunScreenMobile({
   
   // Note: timer sounds are now fully managed by useSoundManager (preloaded there)
 
-  const [isLandscape, setIsLandscape] = useState(false);
+  // Use visible viewport hook for stable sizing
+  const { vvW, vvH, isPortrait, isLandscape: vvIsLandscape } = useVisibleViewport();
+  
+  // Use visible viewport-based orientation (more reliable than window.innerWidth/innerHeight)
+  const isLandscape = vvIsLandscape;
 
-  // Landscape orientation detection
+  // Layout debug mode
+  const searchParams = useSearchParams();
+  const layoutDebug = searchParams?.get("layoutDebug") === "1";
+
+  // Footer height measurement for timer stack offset (landscape only)
+  const footerRef = useRef<HTMLElement>(null);
+  const [footerHeight, setFooterHeight] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+
+  // Portrait-only: Timer stack and main timer refs for vertical centering
+  const timerStackRef = useRef<HTMLDivElement | null>(null);
+  const mainTimerRef = useRef<HTMLDivElement | null>(null);
+
+  // Measure footer height and compute offset (landscape only)
   useEffect(() => {
-    const checkOrientation = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
+    if (isLandscape) {
+      const updateOffset = () => {
+        if (footerRef.current && status !== "finished") {
+          const rect = footerRef.current.getBoundingClientRect();
+          const height = rect.height;
+          setFooterHeight(height);
+          // Offset is 45% of footer height
+          setOffsetY(Math.round(height * 0.45));
+        } else {
+          setFooterHeight(0);
+          setOffsetY(0);
+        }
+      };
 
-    checkOrientation();
-    window.addEventListener("resize", checkOrientation);
-    window.addEventListener("orientationchange", checkOrientation);
+      // Initial measurement
+      updateOffset();
 
-    return () => {
-      window.removeEventListener("resize", checkOrientation);
-      window.removeEventListener("orientationchange", checkOrientation);
-    };
-  }, []);
+      // Re-measure on resize/orientation change
+      window.addEventListener("resize", updateOffset);
+      window.addEventListener("orientationchange", updateOffset);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", updateOffset);
+      }
+
+      return () => {
+        window.removeEventListener("resize", updateOffset);
+        window.removeEventListener("orientationchange", updateOffset);
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener("resize", updateOffset);
+        }
+      };
+    } else {
+      // Portrait: reset landscape offset
+      setFooterHeight(0);
+      setOffsetY(0);
+    }
+  }, [status, isLandscape]);
+
+  // Portrait-only: Center main timer vertically
+  // MainTimer center aligns with screen center
+  // NOTE: Do NOT include remainingSec in dependencies - it causes timer to shift during countdown
+  useEffect(() => {
+    if (!isLandscape && timerStackRef.current && mainTimerRef.current) {
+      const centerTimer = () => {
+        requestAnimationFrame(() => {
+          if (!timerStackRef.current || !mainTimerRef.current || isLandscape) {
+            return;
+          }
+
+          // Get visible viewport height
+          const vvH = window.visualViewport?.height ?? window.innerHeight;
+          const viewportCenterY = vvH / 2;
+
+          // Get main timer center Y
+          const rect = mainTimerRef.current.getBoundingClientRect();
+          const mainCenterY = rect.top + rect.height / 2;
+
+          // Compute delta to center the main timer
+          let delta = viewportCenterY - mainCenterY;
+
+          // Clamp delta to avoid extreme shifts
+          const maxShift = vvH * 0.18;
+          const deltaClamped = Math.max(-maxShift, Math.min(maxShift, delta));
+
+          // Apply transform to center the main timer
+          if (timerStackRef.current) {
+            timerStackRef.current.style.transform = `translateY(${Math.round(deltaClamped)}px)`;
+            timerStackRef.current.style.willChange = "transform";
+          }
+        });
+      };
+
+      // Initial centering with a small delay to ensure layout is stable
+      const timeoutId = setTimeout(() => {
+        centerTimer();
+      }, 100);
+
+      // Re-center on resize/orientation change only (not on timer updates)
+      window.addEventListener("resize", centerTimer);
+      window.addEventListener("orientationchange", centerTimer);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", centerTimer);
+      }
+
+      return () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener("resize", centerTimer);
+        window.removeEventListener("orientationchange", centerTimer);
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener("resize", centerTimer);
+        }
+      };
+    } else {
+      // Landscape: clear portrait transform
+      if (timerStackRef.current) {
+        timerStackRef.current.style.transform = "";
+        timerStackRef.current.style.willChange = "";
+      }
+    }
+  }, [isLandscape]); // Removed remainingSec and status to prevent timer from shifting during countdown
 
   const formatTime = (seconds: number): string => {
     const min = Math.floor(seconds / 60);
@@ -513,16 +618,29 @@ export function ProgramRunScreenMobile({
   if (isLandscape) {
     return (
       <div 
-        className={`w-screen h-dvh flex flex-col text-white ${istokWeb.className} overflow-hidden fixed inset-0`}
+        className={`w-screen text-white ${istokWeb.className} overflow-hidden fixed inset-0 grid grid-rows-[auto,1fr,auto]`}
         style={{ 
           backgroundColor: backgroundColor,
+          height: `${vvH}px`,
+          width: `${vvW}px`,
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
           touchAction: "none",
           userSelect: "none",
           WebkitUserSelect: "none",
         }}
       >
+        {/* Layout debug overlay */}
+        {layoutDebug && (
+          <div className="fixed top-2 right-2 z-[100] rounded bg-black/70 text-white text-[10px] px-2 py-1 font-mono">
+            <div>{`vv: ${Math.round(vvW)}x${Math.round(vvH)}`}</div>
+            <div>{`root: ${Math.round(vvH)}px`}</div>
+            <div>{`orientation: ${isLandscape ? "landscape" : "portrait"}`}</div>
+          </div>
+        )}
+
         {/* Header */}
-        <header className="px-1 pt-0.5 pb-0.5 flex items-start justify-between shrink-0 mt-3">
+        <header className="px-1 pt-0.5 pb-0.5 flex items-start justify-between mt-3">
           {/* Left side: Reset button + Settings + Home icons (vertical stack) + Round label */}
           <div className="flex items-start gap-3">
             {/* Vertical stack: Reset, Settings, Home */}
@@ -606,32 +724,46 @@ export function ProgramRunScreenMobile({
         </header>
 
         {/* Main timer block (center of screen) */}
-        <section className="flex-1 flex flex-col items-center justify-center gap-1 min-h-0 -mt-25">
-          {/* TimerName - 2x larger, italic, centered above MainTimer */}
-          <div className="text-white italic text-center shrink-0" style={{ fontSize: 'clamp(2.5rem, 2.4vw, 4rem)' }}>
-            {getTimerName()}
-          </div>
-
-          {/* MainTimer - 2x larger, centered */}
-          <button
-            type="button"
-            onClick={togglePlayPause}
-            className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
-            style={{ touchAction: "auto" }}
+        <section 
+          className="flex flex-col items-center justify-center gap-1 min-h-0"
+          style={{ paddingBottom: `${footerHeight}px` }}
+        >
+          {/* Timer stack container - moves Timer Name and Main Timer upward together */}
+          <div
+            id="timerStack"
+            style={{
+              transform: offsetY > 0 ? `translateY(-${offsetY}px)` : undefined,
+            }}
           >
-            <div
-              className="text-white font-bold leading-none tracking-[0.05em] text-center"
-              style={{
-                fontSize: 'clamp(10rem, 25vw, 25rem)',
-              }}
-            >
-              {formatTime(remainingSec)}
+            {/* TimerName - 2x larger, italic, centered above MainTimer */}
+            <div className="text-white italic text-center shrink-0" style={{ fontSize: 'clamp(2.5rem, 2.4vw, 4rem)' }}>
+              {getTimerName()}
             </div>
-          </button>
+
+            {/* MainTimer - 2x larger, centered */}
+            <button
+              type="button"
+              onClick={togglePlayPause}
+              className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
+              style={{ touchAction: "auto" }}
+            >
+              <div
+                className="text-white font-bold leading-none tracking-[0.05em] text-center"
+                style={{
+                  fontSize: 'clamp(10rem, 25vw, 25rem)',
+                }}
+              >
+                {formatTime(remainingSec)}
+              </div>
+            </button>
+          </div>
         </section>
 
         {/* Bottom buttons + NEXT label */}
-        <footer className="px-2 pb-4 flex items-end justify-between shrink-0">
+        <footer 
+          ref={footerRef}
+          className="px-2 pb-[calc(1rem+env(safe-area-inset-bottom))] flex items-end justify-between"
+        >
           {/* Left area - empty */}
           <div className="flex-1" />
 
@@ -725,9 +857,15 @@ export function ProgramRunScreenMobile({
         {/* Finish overlay */}
         {status === "finished" && (
           <div 
-            className="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto"
+            className="absolute flex items-center justify-center z-50 pointer-events-auto"
             style={{
               backgroundColor: "rgba(255, 255, 255, 0.8)",
+              top: 0,
+              left: 0,
+              width: `${vvW}px`,
+              height: `${vvH}px`,
+              paddingTop: "env(safe-area-inset-top)",
+              paddingBottom: "env(safe-area-inset-bottom)",
             }}
           >
             {/* Reset and Home icons - top left */}
@@ -823,16 +961,29 @@ export function ProgramRunScreenMobile({
   // Portrait: Simplified vertical layout (matching the provided image)
   return (
     <div 
-      className={`w-screen h-dvh flex flex-col text-white ${istokWeb.className} overflow-hidden fixed inset-0`}
+      className={`w-screen text-white ${istokWeb.className} overflow-hidden fixed inset-0 grid grid-rows-[auto,1fr,auto]`}
       style={{ 
         backgroundColor: backgroundColor,
+        height: `${vvH}px`,
+        width: `${vvW}px`,
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
         touchAction: "none",
         userSelect: "none",
         WebkitUserSelect: "none",
       }}
     >
+      {/* Layout debug overlay */}
+      {layoutDebug && (
+        <div className="fixed top-2 right-2 z-[100] rounded bg-black/70 text-white text-[10px] px-2 py-1 font-mono">
+          <div>{`vv: ${Math.round(vvW)}x${Math.round(vvH)}`}</div>
+          <div>{`root: ${Math.round(vvH)}px`}</div>
+          <div>{`orientation: ${isLandscape ? "landscape" : "portrait"}`}</div>
+        </div>
+      )}
+
       {/* Top bar */}
-      <header className="px-2 pt-2 pb-1 flex items-start justify-between shrink-0 mt-3">
+      <header className="px-2 pt-2 pb-1 flex items-start justify-between mt-3">
         {/* Left side: Reset button + Settings + Home icons (vertical stack) + Round label */}
         <div className="flex items-start gap-3">
           {/* Vertical stack: Reset, Settings */}
@@ -916,33 +1067,53 @@ export function ProgramRunScreenMobile({
       </header>
 
       {/* Center area - Timer name and Main timer */}
-      <section className="flex-1 flex flex-col items-center justify-center min-h-0 -mt-20">
-        {/* Timer name - white, italic, not bold */}
-        <div className="text-white italic text-center mb-3 shrink-0" style={{ fontSize: 'clamp(2rem, 5vw, 4rem)' }}>
-          {getTimerName()}
-        </div>
-
-        {/* MainTimer - large, bold, white, centered */}
-        <button
-          type="button"
-          onClick={togglePlayPause}
-          className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
-          style={{ touchAction: "auto" }}
+      <section 
+        className="flex flex-col items-center justify-center min-h-0"
+        style={{ paddingBottom: `${footerHeight}px` }}
+      >
+        {/* Timer stack container - moves Timer Name and Main Timer upward together (portrait: vertical centering, landscape: footer-based offset) */}
+        <div
+          ref={timerStackRef}
+          id="timerStack"
+          style={
+            isLandscape
+              ? {
+                  transform: offsetY > 0 ? `translateY(-${offsetY}px)` : undefined,
+                }
+              : undefined
+          }
         >
-          <div
-            className="text-white font-bold leading-none tracking-tight text-center"
-            style={{
-              fontSize: 'clamp(9rem, 25vw, 30rem)',
-            }}
-          >
-            {formatTime(remainingSec)}
+          {/* Timer name - white, italic, not bold */}
+          <div className="text-white italic text-center mb-3 shrink-0" style={{ fontSize: 'clamp(2rem, 5vw, 4rem)' }}>
+            {getTimerName()}
           </div>
-        </button>
+
+          {/* MainTimer - large, bold, white, centered */}
+          <button
+            type="button"
+            onClick={togglePlayPause}
+            className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
+            style={{ touchAction: "auto" }}
+          >
+            <div
+              ref={mainTimerRef}
+              className="text-white font-bold leading-none tracking-tight text-center"
+              style={{
+                fontSize: 'clamp(9rem, 25vw, 30rem)',
+              }}
+            >
+              {formatTime(remainingSec)}
+            </div>
+          </button>
+        </div>
       </section>
 
       {/* Bottom area - Buttons and NEXT label */}
       {status !== "finished" && (
-        <footer className="px-4 pb-3 flex flex-col items-center gap-1 shrink-0 mb-15">
+        <footer 
+          ref={footerRef}
+          className="px-4 pt-16 pb-[calc(3.75rem+0.75rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-1"
+        >
           {/* Three buttons in a row */}
           <div className="flex items-center justify-center gap-6">
             {/* Back button - neon cyan */}
@@ -1030,9 +1201,15 @@ export function ProgramRunScreenMobile({
       {/* Finished overlay - Portrait mode */}
       {status === "finished" && (
         <div 
-          className="absolute inset-0 flex flex-col items-center justify-center z-50 pointer-events-auto"
+          className="absolute flex flex-col items-center justify-center z-50 pointer-events-auto"
           style={{
             backgroundColor: "rgba(255, 255, 255, 0.8)", // White with 80% opacity
+            top: 0,
+            left: 0,
+            width: `${vvW}px`,
+            height: `${vvH}px`,
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
           {/* Reset and Home icons - top left */}

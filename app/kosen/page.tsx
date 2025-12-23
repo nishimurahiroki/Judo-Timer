@@ -36,9 +36,9 @@ export default function KosenPage() {
           <JudoTimerScreen initialSettings={DEFAULT_KOSEN_SETTINGS} />
         </FitToScreenContainer>
       ) : (
-        <JudoTimerScaledContainer>
-          <JudoTimerScreen initialSettings={DEFAULT_KOSEN_SETTINGS} />
-        </JudoTimerScaledContainer>
+    <JudoTimerScaledContainer>
+      <JudoTimerScreen initialSettings={DEFAULT_KOSEN_SETTINGS} />
+    </JudoTimerScaledContainer>
       )}
       <A2HSNotice />
     </>
