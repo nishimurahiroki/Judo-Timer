@@ -2,12 +2,13 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Istok_Web } from "next/font/google";
 import Image from "next/image";
 import { useProgramTimer } from "@/hooks/useProgramTimer";
 import type { ProgramStep, Program } from "@/lib/programTimer/types";
 import { ProgramCreateOverlay } from "./ProgramCreateOverlay";
+import { RotateToEditOverlay } from "./overlays/RotateToEditOverlay";
 import { expandProgramRowsToSteps } from "@/lib/programTimer/expand";
 import { formatTimerTitle } from "@/lib/programTimer/formatTitle";
 import { asset } from "@/lib/asset";
@@ -57,6 +58,7 @@ export function ProgramRunScreenMobile({
   } = useProgramTimer({ steps });
   
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [editRequested, setEditRequested] = useState(false);
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
 
   // Ready overlay state
@@ -102,17 +104,14 @@ export function ProgramRunScreenMobile({
   
   // Use visible viewport-based orientation (more reliable than window.innerWidth/innerHeight)
   const isLandscape = vvIsLandscape;
-
-  // Layout debug mode
-  const searchParams = useSearchParams();
-  const layoutDebug = searchParams?.get("layoutDebug") === "1";
+  const isMobile = vvW > 0 && vvW < 1024;
 
   // Footer height measurement for timer stack offset (landscape only)
   const footerRef = useRef<HTMLElement>(null);
   const [footerHeight, setFooterHeight] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
 
-  // Portrait-only: Timer stack and main timer refs for vertical centering
+  // Timer stack and main timer refs (landscape uses timerStackRef for offsetY transform)
   const timerStackRef = useRef<HTMLDivElement | null>(null);
   const mainTimerRef = useRef<HTMLDivElement | null>(null);
 
@@ -156,68 +155,6 @@ export function ProgramRunScreenMobile({
     }
   }, [status, isLandscape]);
 
-  // Portrait-only: Center main timer vertically
-  // MainTimer center aligns with screen center
-  // NOTE: Do NOT include remainingSec in dependencies - it causes timer to shift during countdown
-  useEffect(() => {
-    if (!isLandscape && timerStackRef.current && mainTimerRef.current) {
-      const centerTimer = () => {
-        requestAnimationFrame(() => {
-          if (!timerStackRef.current || !mainTimerRef.current || isLandscape) {
-            return;
-          }
-
-          // Get visible viewport height
-          const vvH = window.visualViewport?.height ?? window.innerHeight;
-          const viewportCenterY = vvH / 2;
-
-          // Get main timer center Y
-          const rect = mainTimerRef.current.getBoundingClientRect();
-          const mainCenterY = rect.top + rect.height / 2;
-
-          // Compute delta to center the main timer
-          let delta = viewportCenterY - mainCenterY;
-
-          // Clamp delta to avoid extreme shifts
-          const maxShift = vvH * 0.18;
-          const deltaClamped = Math.max(-maxShift, Math.min(maxShift, delta));
-
-          // Apply transform to center the main timer
-          if (timerStackRef.current) {
-            timerStackRef.current.style.transform = `translateY(${Math.round(deltaClamped)}px)`;
-            timerStackRef.current.style.willChange = "transform";
-          }
-        });
-      };
-
-      // Initial centering with a small delay to ensure layout is stable
-      const timeoutId = setTimeout(() => {
-        centerTimer();
-      }, 100);
-
-      // Re-center on resize/orientation change only (not on timer updates)
-      window.addEventListener("resize", centerTimer);
-      window.addEventListener("orientationchange", centerTimer);
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", centerTimer);
-      }
-
-      return () => {
-        clearTimeout(timeoutId);
-        window.removeEventListener("resize", centerTimer);
-        window.removeEventListener("orientationchange", centerTimer);
-        if (window.visualViewport) {
-          window.visualViewport.removeEventListener("resize", centerTimer);
-        }
-      };
-    } else {
-      // Landscape: clear portrait transform
-      if (timerStackRef.current) {
-        timerStackRef.current.style.transform = "";
-        timerStackRef.current.style.willChange = "";
-      }
-    }
-  }, [isLandscape]); // Removed remainingSec and status to prevent timer from shifting during countdown
 
   const formatTime = (seconds: number): string => {
     const min = Math.floor(seconds / 60);
@@ -494,12 +431,15 @@ export function ProgramRunScreenMobile({
     // 現在アクティブなタイマーのIDを保存
     const currentStepId = currentStep?.id ?? null;
     setActiveTimerId(currentStepId);
+    // 編集リクエストとオーバーレイを開く（向きに応じて内容が変わる）
+    setEditRequested(true);
     setIsOverlayOpen(true);
   };
   
-  // オーバーレイを閉じる
+  // オーバーレイを閉じる（編集リクエストもクリア）
   const closeOverlay = () => {
     setIsOverlayOpen(false);
+    setEditRequested(false);
     setActiveTimerId(null);
   };
   
@@ -630,15 +570,6 @@ export function ProgramRunScreenMobile({
           WebkitUserSelect: "none",
         }}
       >
-        {/* Layout debug overlay */}
-        {layoutDebug && (
-          <div className="fixed top-2 right-2 z-[100] rounded bg-black/70 text-white text-[10px] px-2 py-1 font-mono">
-            <div>{`vv: ${Math.round(vvW)}x${Math.round(vvH)}`}</div>
-            <div>{`root: ${Math.round(vvH)}px`}</div>
-            <div>{`orientation: ${isLandscape ? "landscape" : "portrait"}`}</div>
-          </div>
-        )}
-
         {/* Header */}
         <header className="px-1 pt-0.5 pb-0.5 flex items-start justify-between mt-3">
           {/* Left side: Reset button + Settings + Home icons (vertical stack) + Round label */}
@@ -927,32 +858,37 @@ export function ProgramRunScreenMobile({
           </div>
         )}
         
-        {/* Program Create Overlay */}
+        {/* Overlay: 向きに応じて内容を切り替え */}
         {isOverlayOpen && selectedProgram && (
-          <ProgramCreateOverlay
-            onClose={closeOverlay}
-            onSave={(program, autoRun) => {
-              // 実行モードではautoRunは無視
-              if (isOverlayOpen && activeTimerId) {
-                // アクティブなタイマーの編集：Doneボタンが押された
-                const activeRowIndex = currentStep?.roundNumber ? currentStep.roundNumber - 1 : null;
-                if (activeRowIndex !== null && program.rows[activeRowIndex]) {
-                  const newDuration = program.rows[activeRowIndex].durationSec;
-                  handleProgramUpdate(program, true, newDuration);
+          isMobile && isLandscape ? (
+            <RotateToEditOverlay onClose={closeOverlay} />
+          ) : (
+            <ProgramCreateOverlay
+              onClose={closeOverlay}
+              onSave={(program, autoRun) => {
+                // 実行モードではautoRunは無視
+                if (isOverlayOpen && activeTimerId) {
+                  // アクティブなタイマーの編集：Doneボタンが押された
+                  const activeRowIndex = currentStep?.roundNumber ? currentStep.roundNumber - 1 : null;
+                  if (activeRowIndex !== null && program.rows[activeRowIndex]) {
+                    const newDuration = program.rows[activeRowIndex].durationSec;
+                    handleProgramUpdate(program, true, newDuration);
+                  } else {
+                    handleProgramUpdate(program, false);
+                  }
                 } else {
                   handleProgramUpdate(program, false);
                 }
-              } else {
-                handleProgramUpdate(program, false);
-              }
-              closeOverlay();
-            }}
-            initialProgram={selectedProgram}
-            activeTimerId={activeTimerId}
-            currentStepIndex={currentStepIndex}
-            currentStep={currentStep}
-            onProgramUpdate={handleProgramUpdate}
-          />
+                closeOverlay();
+              }}
+              initialProgram={selectedProgram}
+              activeTimerId={activeTimerId}
+              currentStepIndex={currentStepIndex}
+              currentStep={currentStep}
+              onProgramUpdate={handleProgramUpdate}
+              forceLandscapeRatios={false}
+            />
+          )
         )}
       </div>
     );
@@ -973,15 +909,6 @@ export function ProgramRunScreenMobile({
         WebkitUserSelect: "none",
       }}
     >
-      {/* Layout debug overlay */}
-      {layoutDebug && (
-        <div className="fixed top-2 right-2 z-[100] rounded bg-black/70 text-white text-[10px] px-2 py-1 font-mono">
-          <div>{`vv: ${Math.round(vvW)}x${Math.round(vvH)}`}</div>
-          <div>{`root: ${Math.round(vvH)}px`}</div>
-          <div>{`orientation: ${isLandscape ? "landscape" : "portrait"}`}</div>
-        </div>
-      )}
-
       {/* Top bar */}
       <header className="px-2 pt-2 pb-1 flex items-start justify-between mt-3">
         {/* Left side: Reset button + Settings + Home icons (vertical stack) + Round label */}
@@ -1068,13 +995,14 @@ export function ProgramRunScreenMobile({
 
       {/* Center area - Timer name and Main timer */}
       <section 
-        className="flex flex-col items-center justify-center min-h-0"
+        className="flex flex-col items-center justify-start flex-1 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] gap-6 mt-6 min-h-0"
         style={{ paddingBottom: `${footerHeight}px` }}
       >
-        {/* Timer stack container - moves Timer Name and Main Timer upward together (portrait: vertical centering, landscape: footer-based offset) */}
+        {/* Timer stack container - moves Timer Name and Main Timer upward together (landscape: footer-based offset) */}
         <div
           ref={timerStackRef}
           id="timerStack"
+          className="flex flex-col items-center gap-6"
           style={
             isLandscape
               ? {
@@ -1112,7 +1040,7 @@ export function ProgramRunScreenMobile({
       {status !== "finished" && (
         <footer 
           ref={footerRef}
-          className="px-4 pt-16 pb-[calc(3.75rem+0.75rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-1"
+          className="px-4 pt-16 mt-20 pb-[calc(3.5rem+0.75rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-1"
         >
           {/* Three buttons in a row */}
           <div className="flex items-center justify-center gap-6">
@@ -1300,33 +1228,38 @@ export function ProgramRunScreenMobile({
         </div>
       )}
       
-      {/* Program Create Overlay */}
+      {/* Overlay: 向きに応じて内容を切り替え */}
       {isOverlayOpen && selectedProgram && (
-        <ProgramCreateOverlay
-          onClose={closeOverlay}
-          transparentBackground={true}
-          onSave={(program, autoRun) => {
-            // 実行モードではautoRunは無視
-            if (isOverlayOpen && activeTimerId) {
-              // アクティブなタイマーの編集：Doneボタンが押された
-              const activeRowIndex = currentStep?.roundNumber ? currentStep.roundNumber - 1 : null;
-              if (activeRowIndex !== null && program.rows[activeRowIndex]) {
-                const newDuration = program.rows[activeRowIndex].durationSec;
-                handleProgramUpdate(program, true, newDuration);
+        isMobile && isLandscape ? (
+          <RotateToEditOverlay onClose={closeOverlay} />
+        ) : (
+          <ProgramCreateOverlay
+            onClose={closeOverlay}
+            transparentBackground={true}
+            onSave={(program, autoRun) => {
+              // 実行モードではautoRunは無視
+              if (isOverlayOpen && activeTimerId) {
+                // アクティブなタイマーの編集：Doneボタンが押された
+                const activeRowIndex = currentStep?.roundNumber ? currentStep.roundNumber - 1 : null;
+                if (activeRowIndex !== null && program.rows[activeRowIndex]) {
+                  const newDuration = program.rows[activeRowIndex].durationSec;
+                  handleProgramUpdate(program, true, newDuration);
+                } else {
+                  handleProgramUpdate(program, false);
+                }
               } else {
                 handleProgramUpdate(program, false);
               }
-            } else {
-              handleProgramUpdate(program, false);
-            }
-            closeOverlay();
-          }}
-          initialProgram={selectedProgram}
-          activeTimerId={activeTimerId}
-          currentStepIndex={currentStepIndex}
-          currentStep={currentStep}
-          onProgramUpdate={handleProgramUpdate}
-        />
+              closeOverlay();
+            }}
+            initialProgram={selectedProgram}
+            activeTimerId={activeTimerId}
+            currentStepIndex={currentStepIndex}
+            currentStep={currentStep}
+            onProgramUpdate={handleProgramUpdate}
+            forceLandscapeRatios={false}
+          />
+        )
       )}
     </div>
   );

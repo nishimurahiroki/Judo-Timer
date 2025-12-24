@@ -1,7 +1,7 @@
 // components/programTimer/ProgramCreateOverlay.tsx
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -24,6 +24,7 @@ import type { EditorRow, Program, RoleGroup } from "@/lib/programTimer/types";
 import { formatSecondsToTime } from "@/lib/programTimer/utils";
 import { generateUUID } from "@/lib/programTimer/expand";
 import { useRoleSettingModalSize } from "@/hooks/useRoleSettingModalSize";
+import { useVisibleViewport } from "@/hooks/useVisibleViewport";
 
 type ProgramCreateOverlayProps = {
   onClose: () => void;
@@ -35,6 +36,8 @@ type ProgramCreateOverlayProps = {
   onProgramUpdate?: (program: Program, isActiveTimerEdit: boolean, newDuration?: number) => void; // 実行モードでの更新コールバック
   /** ProgramRunScreen などから呼び出すときに、背景の黒い半透明レイヤーを消したい場合に使用 */
   transparentBackground?: boolean;
+  /** ProgramRunScreen mobile landscape から開いた場合、固定比率レイアウトを強制適用 */
+  forceLandscapeRatios?: boolean;
 };
 
 // 時間ピッカーコンポーネント（3行表示）
@@ -502,6 +505,280 @@ function TimePickerOverlay({
   );
 }
 
+// FORCE_RATIOS 専用タイマー行コンポーネント（1920x1080基準の比率で固定サイズ）
+function ForceRatiosTimerRow({
+  row,
+  index,
+  isSelected,
+  onToggleSelect,
+  onChange,
+  onDelete,
+  showTapHint,
+  onOpenTimePicker,
+  backgroundColor,
+  scale,
+}: {
+  row: EditorRow;
+  index: number;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onChange: (row: EditorRow) => void;
+  onDelete: () => void;
+  showTapHint: boolean;
+  onOpenTimePicker: () => void;
+  backgroundColor?: string;
+  scale: number;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: row.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleTimeChange = (seconds: number) => {
+    onChange({ ...row, durationSec: seconds });
+  };
+
+  const handleDecrement = () => {
+    const newSec = Math.max(0, row.durationSec - 1);
+    handleTimeChange(newSec);
+  };
+
+  const handleIncrement = () => {
+    handleTimeChange(row.durationSec + 1);
+  };
+
+  // Scale helper
+  const s = (px: number) => Math.max(1, Math.round(px * scale));
+
+  // 1920x1080基準のサイズ
+  const ROW_W = 1320;
+  const ROW_H = 200;
+  const TRASH_W = 72; // Updated from 48
+  const TRASH_H = 72; // Updated from 48
+  const DRAG_W = 50;
+  const DRAG_H = 80;
+  const CHECKBOX_W = 40;
+  const CHECKBOX_H = 40;
+  const BADGE_W = 80; // Updated from 60
+  const BADGE_H = 80; // Updated from 60
+  const ROUND_NAME_W = 514;
+  const ROUND_NAME_H = 60;
+  const PM_BTN_W = 120; // Updated from 90
+  const PM_BTN_H = 120; // Updated from 90
+  const TIME_W = 634;
+  const TIME_H = 100;
+  const GAP = 12;
+  const PAD = 16;
+
+  // 左クラスタ幅（drag + gap + checkbox + gap + badge）
+  const leftClusterWidth = s(DRAG_W + GAP + CHECKBOX_W + GAP + BADGE_W);
+
+  const finalBackgroundColor = backgroundColor || "white";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        width: `${s(ROW_W)}px`,
+        height: `${s(ROW_H)}px`,
+        backgroundColor: finalBackgroundColor,
+      }}
+      className="rounded-lg shadow-md border border-gray-200"
+    >
+      {/* Grid: 上段 (Round Name) / 下段 (メイン行) */}
+      <div
+        className="h-full w-full grid"
+        style={{ gridTemplateRows: "auto 1fr", padding: `${s(PAD)}px` }}
+      >
+        {/* 上段: Round Name input (左クラスタの上に配置) */}
+        <div className="flex items-center" style={{ paddingLeft: `${leftClusterWidth}px` }}>
+          <input
+            type="text"
+            value={row.name}
+            onChange={(e) => onChange({ ...row, name: e.target.value })}
+            placeholder="Round Name"
+            className="rounded-lg border border-gray-300 bg-white placeholder-[#AAA9A9] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              width: `${s(ROUND_NAME_W)}px`,
+              height: `${s(ROUND_NAME_H)}px`,
+              padding: `${s(4)}px ${s(8)}px`,
+              fontSize: `${s(12)}px`,
+              color: "#000000",
+            }}
+          />
+        </div>
+
+        {/* 下段: メイン行 [drag][checkbox][badge][minus][time][plus][trash] */}
+        <div
+          className="flex items-center"
+          style={{ gap: `${s(GAP)}px` }}
+        >
+          {/* Drag handle */}
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-800 touch-none flex-shrink-0 flex items-center justify-center"
+            aria-label="Drag handle"
+            style={{
+              width: `${s(DRAG_W)}px`,
+              height: `${s(DRAG_H)}px`,
+            }}
+          >
+            <svg
+              className="w-full h-full"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+
+          {/* Checkbox */}
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+            style={{
+              width: `${s(CHECKBOX_W)}px`,
+              height: `${s(CHECKBOX_H)}px`,
+            }}
+          />
+
+          {/* Timer number badge */}
+          <div
+            className="rounded-full bg-[#4882FF] flex items-center justify-center text-white font-semibold flex-shrink-0"
+            style={{
+              width: `${s(BADGE_W)}px`,
+              height: `${s(BADGE_H)}px`,
+              fontSize: `${s(BADGE_W * 0.45)}px`,
+            }}
+          >
+            {index + 1}
+          </div>
+
+          {/* Minus button */}
+          <button
+            type="button"
+            onClick={handleDecrement}
+            className="font-bold hover:text-gray-600 transition-colors flex-shrink-0 flex items-center justify-center"
+            style={{
+              width: `${s(PM_BTN_W)}px`,
+              height: `${s(PM_BTN_H)}px`,
+              fontSize: `${s(PM_BTN_W * 0.45)}px`,
+              color: "#111827",
+            }}
+            aria-label="Decrement time"
+          >
+            −
+          </button>
+
+          {/* Time display */}
+          <div
+            className="flex flex-col items-center justify-center flex-shrink-0"
+            style={{
+              width: `${s(TIME_W)}px`,
+              height: `${s(TIME_H)}px`,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onOpenTimePicker}
+              className="font-mono font-bold hover:text-gray-700 transition-colors cursor-pointer"
+              style={{
+                fontSize: `clamp(12px, ${s(46)}px, 48px)`,
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1,
+                color: "#000000",
+                textAlign: "center",
+              }}
+              aria-label="Time display"
+            >
+              {formatSecondsToTime(row.durationSec)}
+            </button>
+            {showTapHint && (
+              <span
+                className="rounded bg-gray-200"
+                style={{
+                  marginTop: `${s(4)}px`,
+                  padding: `${s(2)}px ${s(6)}px`,
+                  fontSize: `${s(10)}px`,
+                  color: "#374151",
+                }}
+              >
+                Tap
+              </span>
+            )}
+          </div>
+
+          {/* Plus button */}
+          <button
+            type="button"
+            onClick={handleIncrement}
+            className="font-bold hover:text-gray-600 transition-colors flex-shrink-0 flex items-center justify-center"
+            style={{
+              width: `${s(PM_BTN_W)}px`,
+              height: `${s(PM_BTN_H)}px`,
+              fontSize: `${s(PM_BTN_W * 0.45)}px`,
+              color: "#111827",
+            }}
+            aria-label="Increment time"
+          >
+            +
+          </button>
+
+          {/* Trash button */}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-lg bg-[#FFC5C5] hover:bg-[#FFB0B0] transition-colors flex items-center justify-center flex-shrink-0"
+            aria-label="Delete row"
+            style={{
+              width: `${s(TRASH_W)}px`,
+              height: `${s(TRASH_H)}px`,
+            }}
+          >
+            <svg
+              fill="none"
+              stroke="#FF0000"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+              style={{
+                width: `${s(TRASH_W * 0.6)}px`,
+                height: `${s(TRASH_H * 0.6)}px`,
+              }}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // タイマー行コンポーネント（ソート可能）
 function TimerRow({
   row,
@@ -513,6 +790,7 @@ function TimerRow({
   showTapHint,
   onOpenTimePicker,
   backgroundColor,
+  landscapeSizes,
 }: {
   row: EditorRow;
   index: number;
@@ -523,6 +801,14 @@ function TimerRow({
   showTapHint: boolean;
   onOpenTimePicker: () => void;
   backgroundColor?: string;
+  landscapeSizes?: {
+    rowW: number;
+    rowH: number;
+    trashBox: number;
+    pmBtn: number;
+    timerNumW: number;
+    timerNumH: number;
+  };
 }) {
   const {
     attributes,
@@ -555,6 +841,18 @@ function TimerRow({
   // 背景色を決定（チェック状態またはロールグループの色）
   const finalBackgroundColor = backgroundColor || "white";
 
+  // Mobile detection for fallback sizing
+  // 内部要素の比率は縦画面と同じを維持するため、isMobileLandscapeの条件分岐は使用しない
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // Mobile: Measure left cluster width to constrain Round Name input
   const leftClusterRef = useRef<HTMLDivElement>(null);
   const [roundNameMaxWidth, setRoundNameMaxWidth] = useState<number | undefined>(undefined);
@@ -574,17 +872,6 @@ function TimerRow({
     return () => window.removeEventListener("resize", updateRoundNameWidth);
   }, []);
 
-  // Mobile detection for fallback sizing
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
   // Check container query support (use window.CSS to avoid conflict with @dnd-kit/utilities CSS)
   const supportsContainerQueries = typeof window !== "undefined" && 
     typeof window.CSS !== "undefined" && 
@@ -598,6 +885,12 @@ function TimerRow({
         ...style,
         backgroundColor: finalBackgroundColor,
         containerType: "inline-size",
+        ...(landscapeSizes
+          ? {
+              width: `${landscapeSizes.rowW}px`,
+              height: `${landscapeSizes.rowH}px`,
+            }
+          : {}),
       }}
       className="timer-row-container w-full rounded-lg shadow-md border border-gray-200 p-3 md:p-4 transition-colors"
     >
@@ -672,10 +965,20 @@ function TimerRow({
           type="button"
           onClick={handleDecrement}
             className="text-gray-800 text-3xl md:text-2xl font-bold hover:text-gray-600 transition-colors flex-shrink-0 min-w-[44px] md:min-w-0"
-            style={{ 
-              fontSize: supportsContainerQueries 
-                ? "clamp(2rem, 6cqi, 3.5rem)" 
-                : (isMobile ? "clamp(32px, 5vw, 56px)" : undefined)
+            style={{
+              ...(landscapeSizes
+                ? {
+                    width: `${landscapeSizes.pmBtn}px`,
+                    height: `${landscapeSizes.pmBtn}px`,
+                  }
+                : {}),
+              ...(landscapeSizes
+                ? {}
+                : {
+                    fontSize: supportsContainerQueries
+                      ? "clamp(2rem, 6cqi, 3.5rem)"
+                      : (isMobile ? "clamp(32px, 5vw, 56px)" : undefined),
+                  }),
             }}
           aria-label="Decrement time"
         >
@@ -683,15 +986,31 @@ function TimerRow({
         </button>
 
           {/* (6) Time display with "Tap" hint - mobile: as large as possible */}
-          <div className="flex flex-col items-center flex-shrink-0 min-w-0">
+          <div
+            className="flex flex-col items-center flex-shrink-0 min-w-0"
+            style={
+              landscapeSizes
+                ? {
+                    width: `${landscapeSizes.timerNumW}px`,
+                    height: `${landscapeSizes.timerNumH}px`,
+                  }
+                : undefined
+            }
+          >
           <button
             type="button"
             onClick={onOpenTimePicker}
               className="font-mono font-bold text-black hover:text-gray-700 transition-colors cursor-pointer leading-none min-w-0"
-              style={{ 
-                fontSize: supportsContainerQueries 
-                  ? "clamp(2rem, 10cqi, 3.5rem)" 
-                  : (isMobile ? "clamp(32px, 8vw, 56px)" : undefined),
+              style={{
+                ...(landscapeSizes
+                  ? {
+                      fontSize: `clamp(12px, ${Math.floor(18 * (landscapeSizes.timerNumH / 100))}px, 36px)`,
+                    }
+                  : {
+                      fontSize: supportsContainerQueries
+                        ? "clamp(2rem, 10cqi, 3.5rem)"
+                        : (isMobile ? "clamp(32px, 8vw, 56px)" : undefined),
+                    }),
                 fontVariantNumeric: "tabular-nums",
               }}
             aria-label="Time display"
@@ -710,10 +1029,20 @@ function TimerRow({
           type="button"
           onClick={handleIncrement}
             className="text-gray-800 text-3xl md:text-2xl font-bold hover:text-gray-600 transition-colors flex-shrink-0 min-w-[44px] md:min-w-0"
-            style={{ 
-              fontSize: supportsContainerQueries 
-                ? "clamp(2rem, 6cqi, 3.5rem)" 
-                : (isMobile ? "clamp(32px, 5vw, 56px)" : undefined)
+            style={{
+              ...(landscapeSizes
+                ? {
+                    width: `${landscapeSizes.pmBtn}px`,
+                    height: `${landscapeSizes.pmBtn}px`,
+                  }
+                : {}),
+              ...(landscapeSizes
+                ? {}
+                : {
+                    fontSize: supportsContainerQueries
+                      ? "clamp(2rem, 6cqi, 3.5rem)"
+                      : (isMobile ? "clamp(32px, 5vw, 56px)" : undefined),
+                  }),
             }}
           aria-label="Increment time"
         >
@@ -726,6 +1055,14 @@ function TimerRow({
           type="button"
           onClick={onDelete}
           className="flex-shrink-0 rounded-lg bg-[#FFC5C5] hover:bg-[#FFB0B0] transition-colors ml-1 md:ml-0 flex items-center justify-center aspect-square w-[35px] h-[35px] md:w-auto md:h-auto md:px-3 md:py-2"
+          style={
+            landscapeSizes
+              ? {
+                  width: `${landscapeSizes.trashBox}px`,
+                  height: `${landscapeSizes.trashBox}px`,
+                }
+              : undefined
+          }
           aria-label="Delete row"
         >
           <svg
@@ -756,6 +1093,7 @@ export function ProgramCreateOverlay({
   currentStep,
   onProgramUpdate,
   transparentBackground = false,
+  forceLandscapeRatios = false,
 }: ProgramCreateOverlayProps) {
   const [programTitle, setProgramTitle] = useState(
     initialProgram?.title ?? "",
@@ -1494,34 +1832,447 @@ export function ProgramCreateOverlay({
     }
   };
 
+  // ===== レイアウト: PC / Mobile Portrait / Mobile Landscape =====
+  // 可視ビューポートを使って、モバイル横画面時のみカードサイズを最適化する
+  const { vvW, vvH, isLandscape: vvIsLandscape } = useVisibleViewport();
+
+  // Use same threshold as ProgramRunScreenMobile for consistency
+  const isMobile = vvW > 0 && vvW < 1024;
+  const isMobileLandscape = isMobile && vvIsLandscape;
+
+  // 固定比率レイアウト用の計算（forceLandscapeRatiosがtrueの場合のみ）
+  let landscapeScale: number | null = null;
+  let landscapeSizes: {
+    cardW: number;
+    cardH: number;
+    timerNameW: number;
+    timerNameH: number;
+    selectRoleW: number;
+    selectRoleH: number;
+    rowW: number;
+    rowH: number;
+    addTimerW: number;
+    addTimerH: number;
+    trashBox: number;
+    pmBtn: number;
+    timerNumW: number;
+    timerNumH: number;
+  } | null = null;
+
+  // forceLandscapeRatiosがtrueの場合、isMobileLandscapeの条件を無視して固定比率レイアウトを計算
+  if (forceLandscapeRatios && vvW && vvH) {
+    // 基準サイズ（1920x1080）
+    const BASE_W = 1920;
+    const BASE_H = 1080;
+    const CARD_W = 1470;
+    const CARD_H = 800;
+    const OUTER_PADDING = 16;
+    const SAFE_PAD = 16;
+
+    const availW = vvW - OUTER_PADDING;
+    const availH = vvH - OUTER_PADDING - SAFE_PAD;
+
+    // スケール計算
+    let scale = Math.min(availW / CARD_W, availH / CARD_H);
+    scale = Math.max(0.35, Math.min(scale, 1.0));
+
+    landscapeScale = scale;
+
+    // カードサイズ
+    const cardW = Math.floor(CARD_W * scale);
+    const cardH = Math.floor(CARD_H * scale);
+
+    // 各要素サイズ
+    landscapeSizes = {
+      cardW,
+      cardH,
+      timerNameW: Math.floor(833 * scale),
+      timerNameH: Math.floor(80 * scale),
+      selectRoleW: Math.floor(398 * scale),
+      selectRoleH: Math.floor(80 * scale),
+      rowW: Math.floor(1320 * scale),
+      rowH: Math.floor(200 * scale),
+      addTimerW: Math.floor(242 * scale),
+      addTimerH: Math.floor(80 * scale),
+      trashBox: Math.floor(75 * scale),
+      pmBtn: Math.floor(90 * scale),
+      timerNumW: Math.floor(634 * scale),
+      timerNumH: Math.floor(100 * scale),
+    };
+  }
+
+  // スタイルオブジェクトを事前に計算しておく
+  let overlayStyle: CSSProperties;
+  let debugFinalW: number | null = null;
+  let debugFinalHMax: number | null = null;
+
+  if (forceLandscapeRatios) {
+    // 固定比率レイアウトモード: 既存のサイズ計算を無視
+    if (landscapeSizes) {
+      overlayStyle = {
+        width: `${landscapeSizes.cardW}px`,
+        height: `${landscapeSizes.cardH}px`,
+      };
+      debugFinalW = landscapeSizes.cardW;
+      debugFinalHMax = landscapeSizes.cardH;
+    } else {
+      // vvW/vvHがまだ取得できていない場合はフォールバック
+      overlayStyle = {
+        width: "95%",
+        maxWidth: "95vw",
+        maxHeight: "90vh",
+        height: "auto",
+      };
+    }
+  } else if (!vvW || !vvH) {
+    // 初期レンダリング時など、ビューポートがまだ取れない場合は従来のモバイルスタイルにフォールバック
+    overlayStyle = {
+      width: "95%",
+      maxWidth: "95vw",
+      maxHeight: "90vh",
+      height: "auto",
+    };
+  } else if (isMobileLandscape) {
+    // Mobile 横画面（iPhone / Android 含む）
+    // 可視ビューポートに基づいてカードサイズを計算しつつ、縦画面と同じ見た目比率を維持
+    const outerPadding = 8; // overlay wrapper p-2
+    const safePad = 16; // 上下のセーフエリア余白
+
+    const availableW = vvW - 2 * outerPadding;
+    const availableH = vvH - 2 * outerPadding - 2 * safePad;
+
+    const maxW = Math.min(availableW * 0.95, vvW * 0.95, 600);
+    const finalHMax = availableH * 0.9;
+
+    const finalW = Math.floor(maxW);
+    const finalHMaxPx = Math.floor(finalHMax);
+
+    debugFinalW = finalW;
+    debugFinalHMax = finalHMaxPx;
+
+    overlayStyle = {
+      width: `${finalW}px`,
+      maxHeight: `${finalHMaxPx}px`,
+      height: "auto",
+    };
+  } else if (vvW >= 768) {
+    // PC / タブレット相当: 既存の PC 用レイアウトを維持
+    overlayStyle = {
+      aspectRatio: "1370 / 1080",
+      width: "min(80vw, calc(80vh * 1370 / 1080))",
+      maxHeight: "80vh",
+      overflowY: "auto",
+    };
+  } else {
+    // Mobile 縦画面: 既存のモバイルレイアウトを維持
+    overlayStyle = {
+      width: "95%",
+      maxWidth: "95vw",
+      maxHeight: "90vh",
+      height: "auto",
+    };
+  }
+
+  // 内部要素のクラスは、モバイル縦・横で共通（Tailwind の md: ブレークポイントのみでPCと分岐）
+  const topSectionClassName =
+    "flex flex-col md:flex-row items-start justify-between gap-2 md:gap-4 mb-4 md:mb-6 flex-shrink-0";
+
+  const rowsContainerClassName =
+    "flex-1 flex flex-col gap-4 mb-6 min-h-0 overflow-y-auto";
+
+  const bottomButtonsClassName =
+    "flex flex-col md:flex-row justify-end gap-3 md:gap-4 flex-shrink-0";
+
+  const timerNameInputClassName =
+    "flex-1 min-w-0 rounded-lg border border-gray-400 bg-white px-3 md:px-4 py-2 md:py-3 text-sm md:text-base text-black placeholder-[#AAA9A9] focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  const selectRoleButtonClassName = (hasSelection: boolean) => {
+    const baseClasses =
+      "w-full md:w-auto px-4 py-2 rounded-lg text-white font-bold transition-colors flex-shrink-0 text-sm md:text-base";
+    const colorClasses = hasSelection
+      ? "bg-[#0044FF] hover:bg-[#0033CC] cursor-pointer"
+      : "bg-[#00258B] cursor-not-allowed opacity-60";
+    return `${baseClasses} ${colorClasses}`;
+  };
+
+  // ===== FORCE_RATIOS 専用レイアウト (ProgramRunScreen mobile landscape 用) =====
+  if (forceLandscapeRatios && landscapeSizes) {
+    const scale = landscapeScale ?? 1;
+    const pad = Math.round(32 * scale); // PCのp-8(32px)をスケール
+    const closeSize = Math.floor(80 * scale);
+    const columnGap = Math.floor(16 * scale);
+
+    return (
+      <>
+        <div
+          className={`fixed inset-0 z-[9999] flex items-center justify-center ${
+            transparentBackground ? "bg-transparent" : "bg-black/40"
+          }`}
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+        >
+          <div
+            ref={overlayRef}
+            className="relative bg-[#E9E8E8] rounded-xl shadow-2xl overflow-hidden"
+            style={{
+              width: `${landscapeSizes.cardW}px`,
+              height: `${landscapeSizes.cardH}px`,
+              padding: `${pad}px`,
+            }}
+          >
+
+
+            {/* Card inner grid: header / rows+add / footer */}
+            <div
+              className="h-full w-full grid"
+              style={{ gridTemplateRows: "auto 1fr auto" }}
+            >
+              {/* Header row */}
+              <div
+                className="grid items-center"
+                style={{
+                  gridTemplateColumns: `${landscapeSizes.timerNameW}px ${landscapeSizes.selectRoleW}px ${closeSize}px`,
+                  columnGap: `${columnGap}px`,
+                }}
+              >
+                {/* Timer Name */}
+                <input
+                  type="text"
+                  value={programTitle}
+                  onChange={(e) => setProgramTitle(e.target.value)}
+                  placeholder="Timer Name"
+                  className="rounded-lg border border-gray-400 bg-white px-3 py-2 text-sm md:text-base text-black placeholder-[#AAA9A9] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{
+                    width: `${landscapeSizes.timerNameW}px`,
+                    height: `${landscapeSizes.timerNameH}px`,
+                  }}
+                />
+
+                {/* Select Role */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (draftSelectedRowIds.size > 0) {
+                      setDraftSelectedRowIdsBeforeRoleSetting(
+                        new Set(draftSelectedRowIds),
+                      );
+                      setRoleSettingOpen(true);
+                    }
+                  }}
+                  disabled={draftSelectedRowIds.size === 0}
+                  className={`rounded-lg text-white font-bold transition-colors text-sm md:text-base ${
+                    draftSelectedRowIds.size > 0
+                      ? "bg-[#0044FF] hover:bg-[#0033CC] cursor-pointer"
+                      : "bg-[#00258B] cursor-not-allowed opacity-60"
+                  }`}
+                  style={{
+                    width: `${landscapeSizes.selectRoleW}px`,
+                    height: `${landscapeSizes.selectRoleH}px`,
+                  }}
+                >
+                  Select Role
+                </button>
+
+                {/* Close X */}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
+                  aria-label="Close"
+                  style={{
+                    width: `${closeSize}px`,
+                    height: `${closeSize}px`,
+                  }}
+                >
+                  <svg
+                    className="w-5 h-5 md:w-6 md:h-6 text-gray-700"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Middle area: rows + +Timer */}
+              <div className="min-h-0 flex flex-col mt-4">
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={rows.map((r) => r.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {rows.map((row, index) => {
+                        const rowBackgroundColor = getRowBackgroundColor(row);
+                        const isSelected =
+                          committedSelectedRowIds.has(row.id) ||
+                          draftSelectedRowIds.has(row.id);
+                        return (
+                          <div
+                            key={row.id}
+                            className="mb-3 last:mb-0 flex flex-col items-center"
+                          >
+                            <ForceRatiosTimerRow
+                              row={row}
+                              index={index}
+                              isSelected={isSelected}
+                              onToggleSelect={() => handleToggleSelect(row.id)}
+                              onChange={(updated) =>
+                                handleUpdateRow(row.id, updated)
+                              }
+                              onDelete={() => handleDeleteRow(row.id)}
+                              showTapHint={showTapHint && index === 0}
+                              onOpenTimePicker={() =>
+                                handleOpenTimePicker(index)
+                              }
+                              backgroundColor={rowBackgroundColor}
+                              scale={scale}
+                            />
+                          </div>
+                        );
+                      })}
+                    </SortableContext>
+                  </DndContext>
+                </div>
+
+                {/* + Timer button under rows, left aligned */}
+                <div className="pt-3">
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className="text-[#0077FF] font-semibold hover:text-[#0055CC] transition-colors"
+                    style={{
+                      width: `${landscapeSizes.addTimerW}px`,
+                      height: `${landscapeSizes.addTimerH}px`,
+                    }}
+                  >
+                    + Timer
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer: Done / Save buttons bottom-right */}
+              <div className="flex justify-end items-end mt-4">
+                {isRunMode ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSave(false)}
+                    className="px-6 py-3 rounded-lg bg-[#00E467] text-white font-bold hover:bg-[#00CC55] transition-colors"
+                  >
+                    Done
+                  </button>
+                ) : (
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSave(false)}
+                      className="px-6 py-3 rounded-lg bg-[#0044FF] text-white font-bold hover:bg-[#0033CC] transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSave(true)}
+                      className="px-6 py-3 rounded-lg bg-[#00E467] text-white font-bold hover:bg-[#00CC55] transition-colors"
+                    >
+                      Save & Start
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 時間ピッカーオーバーレイ */}
+        {timePickerOpen && editingRowIndex !== null && (
+          <TimePickerOverlay
+            isOpen={timePickerOpen}
+            timerIndex={editingRowIndex}
+            initialSeconds={rows[editingRowIndex]?.durationSec ?? 0}
+            onClose={handleCloseTimePicker}
+            onConfirm={handleTimePickerConfirm}
+          />
+        )}
+
+        {/* Role settingパネル */}
+        {roleSettingOpen && (
+          <RoleSettingPanel
+            isOpen={roleSettingOpen}
+            setsMode={setsMode}
+            fixedSetsCount={fixedSetsCount}
+            personAlternationEnabled={personAlternationEnabled}
+            onSetsModeChange={setSetsMode}
+            onFixedSetsCountChange={setFixedSetsCount}
+            onPersonAlternationChange={setPersonAlternationEnabled}
+            onConfirm={handleRoleSettingConfirm}
+            onClose={handleRoleSettingClose}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ===== 通常レイアウト (PC / Mobile Portrait / Mobile Landscape 汎用) =====
   return (
     <div
-      className={`fixed inset-0 z-30 flex items-center justify-center p-2 md:p-4 ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center ${
         transparentBackground ? "bg-transparent" : "bg-black/40"
       }`}
+      style={
+        forceLandscapeRatios
+          ? {
+              paddingTop: "env(safe-area-inset-top)",
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }
+          : {
+              padding: "0.5rem",
+              paddingTop: "calc(env(safe-area-inset-top) + 8px)",
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
+            }
+      }
     >
-      {/* Inner container: PC = 1370:1080 aspect ratio, Mobile = 95% width, auto height */}
       <div
         ref={overlayRef}
-        className="bg-[#E9E8E8] rounded-xl shadow-xl flex flex-col p-4 md:p-8 relative w-[95%] max-h-[90vh] md:w-auto md:h-auto overflow-y-auto"
-        style={{
-          ...(typeof window !== "undefined" && window.innerWidth >= 768
+        className={`bg-[#E9E8E8] rounded-xl shadow-xl flex flex-col min-h-0 p-4 md:p-8 relative ${
+          forceLandscapeRatios
+            ? "overflow-hidden"
+            : isMobileLandscape
+            ? "max-w-[calc(100%-16px)] max-h-[calc(100%-16px)] w-auto overflow-hidden"
+            : "overflow-y-auto"
+        }`}
+        style={
+          forceLandscapeRatios && landscapeSizes
             ? {
-                aspectRatio: "1370 / 1080",
-                width: "min(80vw, calc(80vh * 1370 / 1080))",
-                maxHeight: "80vh",
-                overflowY: "auto",
+                width: `${landscapeSizes.cardW}px`,
+                height: `${landscapeSizes.cardH}px`,
               }
-            : {
-                width: "95%",
-                maxWidth: "95vw",
-                maxHeight: "90vh",
+            : forceLandscapeRatios
+            ? overlayStyle // vvW/vvHがまだ取得できていない場合のフォールバック
+            : isMobileLandscape
+            ? {
+                width: "min(calc(100vw - 16px), 95vw)",
+                maxWidth: "calc(100vw - 16px)",
+                maxHeight: "calc(100vh - 16px)",
                 height: "auto",
-              }),
-        }}
+              }
+            : overlayStyle
+        }
       >
         {/* Top section: Timer Name input, Grouping button, and Close X */}
-        <div className="flex flex-col md:flex-row items-start justify-between gap-2 md:gap-4 mb-4 md:mb-6 flex-shrink-0">
+        <div className={topSectionClassName}>
           {/* Top row: Timer Name input and Close X */}
           <div className="flex items-start justify-between gap-2 w-full md:w-auto md:flex-1">
             {/* Timer Name input */}
@@ -1530,7 +2281,15 @@ export function ProgramCreateOverlay({
               value={programTitle}
               onChange={(e) => setProgramTitle(e.target.value)}
             placeholder="Timer Name"
-            className="flex-1 min-w-0 rounded-lg border border-gray-400 bg-white px-3 md:px-4 py-2 md:py-3 text-sm md:text-base text-black placeholder-[#AAA9A9] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={timerNameInputClassName}
+            style={
+              forceLandscapeRatios && landscapeSizes
+                ? {
+                    width: `${landscapeSizes.timerNameW}px`,
+                    height: `${landscapeSizes.timerNameH}px`,
+                  }
+                : undefined
+            }
             />
 
           {/* Close X icon */}
@@ -1567,18 +2326,22 @@ export function ProgramCreateOverlay({
               }
             }}
             disabled={draftSelectedRowIds.size === 0}
-            className={`w-full md:w-auto px-4 py-2 rounded-lg text-white font-bold transition-colors flex-shrink-0 text-sm md:text-base ${
-              draftSelectedRowIds.size > 0
-                ? "bg-[#0044FF] hover:bg-[#0033CC] cursor-pointer"
-                : "bg-[#00258B] cursor-not-allowed opacity-60"
-            }`}
+            className={selectRoleButtonClassName(draftSelectedRowIds.size > 0)}
+            style={
+              forceLandscapeRatios && landscapeSizes
+                ? {
+                    width: `${landscapeSizes.selectRoleW}px`,
+                    height: `${landscapeSizes.selectRoleH}px`,
+                  }
+                : undefined
+            }
           >
             Select Role
                 </button>
               </div>
 
         {/* Timer rows container with scroll */}
-        <div className="flex-1 flex flex-col gap-4 mb-6 min-h-0 overflow-y-auto">
+        <div className={rowsContainerClassName}>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1605,6 +2368,18 @@ export function ProgramCreateOverlay({
                     showTapHint={showTapHint && index === 0}
                     onOpenTimePicker={() => handleOpenTimePicker(index)}
                     backgroundColor={rowBackgroundColor}
+                    landscapeSizes={
+                      forceLandscapeRatios && landscapeSizes
+                        ? {
+                            rowW: landscapeSizes.rowW,
+                            rowH: landscapeSizes.rowH,
+                            trashBox: landscapeSizes.trashBox,
+                            pmBtn: landscapeSizes.pmBtn,
+                            timerNumW: landscapeSizes.timerNumW,
+                            timerNumH: landscapeSizes.timerNumH,
+                          }
+                        : undefined
+                    }
                   />
                 );
               })}
@@ -1616,13 +2391,21 @@ export function ProgramCreateOverlay({
             type="button"
               onClick={handleAddRow}
             className="self-start px-4 py-2 text-[#0077FF] font-semibold hover:text-[#0055CC] transition-colors flex-shrink-0"
+            style={
+              forceLandscapeRatios && landscapeSizes
+                ? {
+                    width: `${landscapeSizes.addTimerW}px`,
+                    height: `${landscapeSizes.addTimerH}px`,
+                  }
+                : undefined
+            }
             >
             + Timer
             </button>
           </div>
 
         {/* Bottom buttons: Save and Save & Start (or Done in run mode) */}
-        <div className="flex flex-col md:flex-row justify-end gap-3 md:gap-4 flex-shrink-0">
+        <div className={bottomButtonsClassName}>
           {isRunMode ? (
             // 実行モード: Doneボタンのみ
               <button
