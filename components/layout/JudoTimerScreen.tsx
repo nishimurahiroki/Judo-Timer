@@ -152,6 +152,7 @@ export function JudoTimerScreen({
   // サウンドマネージャー
   const { play, unlockAudio } = useSoundManager(settings.sound.enabled);
   
+  
   // iPhone検出（オーディオアンロック用）
   const isIPhoneRef = useRef<boolean | null>(null);
   const audioUnlockedOnceRef = useRef(false);
@@ -854,12 +855,12 @@ export function JudoTimerScreen({
           onClick={() => {
             router.push("/");
           }}
-          className="absolute top-4 left-4 z-[100] rounded-md px-3 py-2 transition-colors"
+          className="absolute top-4 left-4 z-[100] rounded-md px-5 py-4 transition-colors"
           style={{ color: "white" }}
           aria-label="Home"
         >
           <svg
-            className="w-6 h-6"
+            className="w-10 h-10"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

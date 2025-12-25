@@ -59,6 +59,7 @@ export function JudoTimerScaledContainer({
   const [baseHeight, setBaseHeight] = useState(900);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // スケール計算
@@ -88,6 +89,8 @@ export function JudoTimerScaledContainer({
 
     // 縦向き検出
     setIsPortrait(viewportHeight > viewportWidth);
+    // モバイル判定
+    setIsMobile(viewportWidth > 0 && viewportWidth < 1024);
   };
 
   // リサイズ・フルスクリーン変更時のスケール更新
@@ -190,17 +193,30 @@ export function JudoTimerScaledContainer({
         {children}
       </div>
 
-      {/* 縦向きオーバーレイ */}
-      {isPortrait && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="text-center text-white px-8">
-            <p className="text-3xl font-semibold mb-4">
-              Rotate device for match view
-            </p>
-            <p className="text-lg text-gray-300">
-              Please rotate your device to landscape mode
-            </p>
+      {/* 縦向きオーバーレイ - モバイルのみ表示 */}
+      {isPortrait && isMobile && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-auto">
+          {/* Rotate icon - centered horizontally, above text */}
+          <div className="mb-6">
+            <svg
+              width="96"
+              height="96"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-white"
+            >
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+            </svg>
           </div>
+
+          {/* Message text - single sentence, English only */}
+          <p className="text-white text-center px-8 text-lg font-medium">
+            Rotate your device to landscape to start the timer.
+          </p>
         </div>
       )}
     </div>

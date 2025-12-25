@@ -29,7 +29,7 @@ export function RotateToEditOverlay({ onClose }: RotateToEditOverlayProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{
         padding: "0.5rem",
         paddingTop: "calc(env(safe-area-inset-top) + 8px)",
@@ -37,7 +37,7 @@ export function RotateToEditOverlay({ onClose }: RotateToEditOverlayProps) {
       }}
     >
       <div
-        className="bg-[#E9E8E8] rounded-xl shadow-xl flex flex-col min-h-0 p-4 md:p-8 relative overflow-y-auto"
+        className="bg-black/50 rounded-xl shadow-xl flex flex-col min-h-0 p-4 md:p-8 relative overflow-y-auto"
         style={overlayStyle}
       >
         {/* Close X button - top right */}
@@ -75,15 +75,15 @@ export function RotateToEditOverlay({ onClose }: RotateToEditOverlayProps) {
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-gray-700"
+              className="text-white"
             >
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
             </svg>
           </div>
 
           {/* Message text */}
-          <p className="text-base md:text-lg text-gray-800 font-medium px-4">
-            編集は縦画面で行います。端末を縦にしてください
+          <p className="text-base md:text-lg text-white font-medium px-4">
+          To edit, rotate your device to portrait mode.
           </p>
         </div>
       </div>

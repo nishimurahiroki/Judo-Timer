@@ -58,7 +58,6 @@ export function ProgramRunScreenMobile({
   } = useProgramTimer({ steps });
   
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [editRequested, setEditRequested] = useState(false);
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
 
   // Ready overlay state
@@ -431,15 +430,13 @@ export function ProgramRunScreenMobile({
     // 現在アクティブなタイマーのIDを保存
     const currentStepId = currentStep?.id ?? null;
     setActiveTimerId(currentStepId);
-    // 編集リクエストとオーバーレイを開く（向きに応じて内容が変わる）
-    setEditRequested(true);
+    // オーバーレイを開く（向きに応じて内容が変わる）
     setIsOverlayOpen(true);
   };
   
-  // オーバーレイを閉じる（編集リクエストもクリア）
+  // オーバーレイを閉じる
   const closeOverlay = () => {
     setIsOverlayOpen(false);
-    setEditRequested(false);
     setActiveTimerId(null);
   };
   

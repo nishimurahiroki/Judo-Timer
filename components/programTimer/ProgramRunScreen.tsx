@@ -39,6 +39,18 @@ export function ProgramRunScreen({
     typeof navigator !== "undefined" &&
     /iP(hone|od|ad)/.test(navigator.userAgent);
 
+  // PC detection (client-side only)
+  const [isPC, setIsPC] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const checkPC = () => {
+      setIsPC(window.innerWidth >= 1024);
+    };
+    checkPC();
+    window.addEventListener("resize", checkPC);
+    return () => window.removeEventListener("resize", checkPC);
+  }, []);
+
   // Debug: Component mount/unmount tracking
   useEffect(() => {
     console.log("[ProgramRunScreen] mount", {
@@ -840,28 +852,72 @@ export function ProgramRunScreen({
             backgroundColor: "rgba(255, 255, 255, 0.8)",
           }}
         >
-          {/* Home button - top-left */}
-          <button
-            type="button"
-            onClick={goHome}
-            className="absolute top-4 left-4 z-10 transition-transform duration-100 active:scale-95 pointer-events-auto"
-            style={{ touchAction: "auto" }}
-            aria-label="Home"
-          >
-            <svg
-              className="w-12 h-12"
-              fill="none"
-              stroke="black"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
+          {/* Buttons container - top-left */}
+          {isPC ? (
+            <div className="absolute top-4 left-4 z-10 flex flex-col items-center gap-3 pointer-events-auto">
+              {/* Reset button - circular with #00EEFF background */}
+              <button
+                type="button"
+                onClick={resetTimer}
+                className="w-12 h-12 rounded-full bg-[#00EEFF] flex items-center justify-center transition-transform duration-100 active:scale-95 pointer-events-auto"
+                style={{ touchAction: "auto" }}
+                aria-label="Reset"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+                </svg>
+              </button>
+              {/* Home button */}
+              <button
+                type="button"
+                onClick={goHome}
+                className="transition-transform duration-100 active:scale-95 pointer-events-auto"
+                style={{ touchAction: "auto" }}
+                aria-label="Home"
+              >
+                <svg
+                  className="w-12 h-12"
+                  fill="none"
+                  stroke="black"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                  />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            /* Home button - top-left (mobile, unchanged) */
+            <button
+              type="button"
+              onClick={goHome}
+              className="absolute top-4 left-4 z-10 transition-transform duration-100 active:scale-95 pointer-events-auto"
+              style={{ touchAction: "auto" }}
+              aria-label="Home"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-12 h-12"
+                fill="none"
+                stroke="black"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+            </button>
+          )}
           
           {/* FINISH text - centered */}
           <div
