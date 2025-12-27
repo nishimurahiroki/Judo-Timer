@@ -899,6 +899,7 @@ export function ProgramRunScreenMobile({
         backgroundColor: backgroundColor,
         height: `${vvH}px`,
         width: `${vvW}px`,
+        minHeight: isMobile && isPortrait ? "100svh" : undefined,
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "env(safe-area-inset-bottom)",
         touchAction: "none",
@@ -992,45 +993,87 @@ export function ProgramRunScreenMobile({
 
       {/* Center area - Timer name and Main timer */}
       <section 
-        className="flex flex-col items-center justify-start flex-1 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] gap-6 mt-6 min-h-0"
-        style={{ paddingBottom: `${footerHeight}px` }}
+        className={`flex flex-col items-center flex-1 min-h-0 ${
+          isMobile && isPortrait 
+            ? "justify-center" 
+            : "justify-start pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] gap-6 mt-6"
+        }`}
+        style={isMobile && isPortrait ? undefined : { paddingBottom: `${footerHeight}px` }}
       >
         {/* Timer stack container - moves Timer Name and Main Timer upward together (landscape: footer-based offset) */}
-        <div
-          ref={timerStackRef}
-          id="timerStack"
-          className="flex flex-col items-center gap-6"
-          style={
-            isLandscape
-              ? {
-                  transform: offsetY > 0 ? `translateY(-${offsetY}px)` : undefined,
-                }
-              : undefined
-          }
-        >
-          {/* Timer name - white, italic, not bold */}
-          <div className="text-white italic text-center mb-3 shrink-0" style={{ fontSize: 'clamp(2rem, 5vw, 4rem)' }}>
-            {getTimerName()}
-          </div>
-
-          {/* MainTimer - large, bold, white, centered */}
-          <button
-            type="button"
-            onClick={togglePlayPause}
-            className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
-            style={{ touchAction: "auto" }}
+        {isMobile && isPortrait ? (
+          /* Mobile Portrait: Absolute centered positioning */
+          <div
+            ref={timerStackRef}
+            id="timerStack"
+            className="absolute flex flex-col items-center"
+            style={{
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
           >
-            <div
-              ref={mainTimerRef}
-              className="text-white font-bold leading-none tracking-tight text-center"
-              style={{
-                fontSize: 'clamp(9rem, 25vw, 30rem)',
-              }}
-            >
-              {formatTime(remainingSec)}
+            {/* Timer name - white, italic, not bold */}
+            <div className="text-white italic text-center mb-3 shrink-0" style={{ fontSize: 'clamp(2rem, 5vw, 4rem)' }}>
+              {getTimerName()}
             </div>
-          </button>
-        </div>
+
+            {/* MainTimer - large, bold, white, centered */}
+            <button
+              type="button"
+              onClick={togglePlayPause}
+              className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
+              style={{ touchAction: "auto" }}
+            >
+              <div
+                ref={mainTimerRef}
+                className="text-white font-bold leading-none tracking-tight text-center"
+                style={{
+                  fontSize: 'clamp(9rem, 25vw, 30rem)',
+                }}
+              >
+                {formatTime(remainingSec)}
+              </div>
+            </button>
+          </div>
+        ) : (
+          /* Mobile Landscape / Desktop: Original layout */
+          <div
+            ref={timerStackRef}
+            id="timerStack"
+            className="flex flex-col items-center gap-6"
+            style={
+              isLandscape
+                ? {
+                    transform: offsetY > 0 ? `translateY(-${offsetY}px)` : undefined,
+                  }
+                : undefined
+            }
+          >
+            {/* Timer name - white, italic, not bold */}
+            <div className="text-white italic text-center mb-3 shrink-0" style={{ fontSize: 'clamp(2rem, 5vw, 4rem)' }}>
+              {getTimerName()}
+            </div>
+
+            {/* MainTimer - large, bold, white, centered */}
+            <button
+              type="button"
+              onClick={togglePlayPause}
+              className="active:scale-95 transition-transform duration-100 focus:outline-none shrink-0"
+              style={{ touchAction: "auto" }}
+            >
+              <div
+                ref={mainTimerRef}
+                className="text-white font-bold leading-none tracking-tight text-center"
+                style={{
+                  fontSize: 'clamp(9rem, 25vw, 30rem)',
+                }}
+              >
+                {formatTime(remainingSec)}
+              </div>
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Bottom area - Buttons and NEXT label */}
